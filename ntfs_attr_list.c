@@ -174,8 +174,7 @@ errno_t ntfs_attr_list_delete(ntfs_inode *ni, ntfs_attr_search_ctx *ctx)
 			NVolSetErrors(ni->vol);
 		}
 		/* Free the runlist of the attribute list attribute. */
-		OSFree(ni->attr_list_rl.rl, ni->attr_list_rl.alloc,
-				ntfs_malloc_tag);
+		free(ni->attr_list_rl.rl, M_NTFS);
 		ni->attr_list_rl.alloc = 0;
 	}
 	/* Delete the attribute list attribute record. */
@@ -184,7 +183,7 @@ errno_t ntfs_attr_list_delete(ntfs_inode *ni, ntfs_attr_search_ctx *ctx)
 	NInoSetMrecNeedsDirtying(ni);
 	/* Update the in-memory base inode and free memory. */
 	ni->attr_list_size = 0;
-	OSFree(ni->attr_list, ni->attr_list_alloc, ntfs_malloc_tag);
+	free(ni->attr_list, M_NTFS);
 	ni->attr_list_alloc = 0;
 	NInoClearAttrList(ni);
 	ntfs_debug("Done.");
@@ -260,7 +259,7 @@ errno_t ntfs_attr_list_add(ntfs_inode *base_ni, MFT_RECORD *m,
 	 * build the attribute list attribute up in memory.
 	 */
 	al_alloc = NTFS_ALLOC_BLOCK;
-	al = OSMalloc(NTFS_ALLOC_BLOCK, ntfs_malloc_tag);
+	al = malloc(NTFS_ALLOC_BLOCK, M_NTFS, M_WAITOK);
 	if (!al) {
 		ntfs_error(vol->mp, "Not enough memory to allocate buffer for "
 				"attribute list attribute.");
@@ -553,9 +552,7 @@ insert:
 							"cluster(s).", err);
 					NVolSetErrors(vol);
 				}
-				OSFree(base_ni->attr_list_rl.rl,
-						base_ni->attr_list_rl.alloc,
-						ntfs_malloc_tag);
+				free(base_ni->attr_list_rl.rl, M_NTFS);
 				base_ni->attr_list_rl.elements = 0;
 				base_ni->attr_list_rl.alloc = 0;
 			}
@@ -909,8 +906,7 @@ undo:
 					"cluster(s).", err2);
 			NVolSetErrors(vol);
 		}
-		OSFree(base_ni->attr_list_rl.rl, base_ni->attr_list_rl.alloc,
-				ntfs_malloc_tag);
+		free(base_ni->attr_list_rl.rl, M_NTFS);
 		base_ni->attr_list_rl.elements = 0;
 		base_ni->attr_list_rl.alloc = 0;
 	}
@@ -1077,7 +1073,7 @@ delete_err:
 	NInoSetMrecNeedsDirtying(base_ni);
 free_err:
 	lck_rw_unlock_exclusive(&base_ni->attr_list_rl.lock);
-	OSFree(al, al_alloc, ntfs_malloc_tag);
+	free(al, M_NTFS);
 	return err;
 }
 
@@ -1796,7 +1792,7 @@ non_resident:
 					"cluster(s).", err2);
 			NVolSetErrors(vol);
 		}
-		OSFree(runlist.rl, runlist.alloc, ntfs_malloc_tag);
+		free(runlist.rl, M_NTFS);
 		goto unl_done;
 	}
 	/* Determine the size of the mapping pairs array. */
@@ -2225,7 +2221,7 @@ cut:
 		u8 *tmp;
 		unsigned entry_ofs;
 
-		tmp = OSMalloc(new_alloc, ntfs_malloc_tag);
+		tmp = malloc(new_alloc, M_NTFS, M_WAITOK);
 		/*
 		 * If the allocation fails then do not shrink the buffer and
 		 * just cut out the entries to be deleted which will waste some
@@ -2237,7 +2233,7 @@ cut:
 		memcpy(tmp, ni->attr_list, entry_ofs);
 		if (to_copy > 0)
 			memcpy(tmp + entry_ofs, end_entry, to_copy);
-		OSFree(ni->attr_list, ni->attr_list_alloc, ntfs_malloc_tag);
+		free(ni->attr_list, M_NTFS);
 		ni->attr_list_alloc = new_alloc;
 		ni->attr_list = tmp;
 	}
