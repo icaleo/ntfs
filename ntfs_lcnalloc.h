@@ -36,6 +36,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_LCNALLOC_H
+#define _OSX_NTFS_LCNALLOC_H
 
 
 
@@ -64,3 +66,4 @@ __private_extern__ errno_t ntfs_cluster_free(ntfs_inode *ni,
 		const VCN start_vcn, s64 count, ntfs_attr_search_ctx *ctx,
 		s64 *nr_freed);
 
+#endif /* !_OSX_NTFS_LCNALLOC_H */

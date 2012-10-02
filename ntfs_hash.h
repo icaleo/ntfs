@@ -36,6 +36,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_HASH_H
+#define _OSX_NTFS_HASH_H
 
 
 
@@ -65,3 +67,4 @@ static inline void ntfs_inode_hash_rm_nolock(ntfs_inode *ni)
 
 __private_extern__ void ntfs_inode_hash_rm(ntfs_inode *ni);
 
+#endif /* !_OSX_NTFS_HASH_H */

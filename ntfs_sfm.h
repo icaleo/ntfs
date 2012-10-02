@@ -35,6 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_SFM_H
+#define _OSX_NTFS_SFM_H
 
 
 #include "ntfs_endian.h"
@@ -323,3 +325,4 @@ __private_extern__ ntfschar NTFS_SFM_COMMENTS_NAME[9];
 __private_extern__ BOOL ntfs_is_sfm_name(ntfs_volume *vol,
 		const ntfschar *name, const unsigned len);
 
+#endif /* !_OSX_NTFS_SFM_H */

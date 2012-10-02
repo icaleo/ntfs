@@ -8,13 +8,13 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ *    this list of conditions and the following disclaimer. 
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ *    and/or other materials provided with the distribution. 
  * 3. Neither the name of Apple Inc. ("Apple") nor the names of its
  *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
+ *    software without specific prior written permission. 
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -35,6 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_DEBUG_H
+#define _OSX_NTFS_DEBUG_H
 
 
 #include "ntfs_runlist.h"
@@ -83,3 +85,4 @@ __private_extern__ void ntfs_debug_attr_list_dump(const u8 *al,
 
 #endif /* !DEBUG */
 
+#endif /* !_OSX_NTFS_DEBUG_H */

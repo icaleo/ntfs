@@ -35,6 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_INODE_H
+#define _OSX_NTFS_INODE_H
 
 
 
@@ -670,3 +672,4 @@ __private_extern__ errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni,
 __private_extern__ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni,
 		ntfs_inode *child_ni, BOOL *is_parent, ntfs_inode *forbid_ni);
 
+#endif /* !_OSX_NTFS_INODE_H */

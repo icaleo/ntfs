@@ -8,13 +8,13 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ *    this list of conditions and the following disclaimer. 
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ *    and/or other materials provided with the distribution. 
  * 3. Neither the name of Apple Inc. ("Apple") nor the names of its
  *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
+ *    software without specific prior written permission. 
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -35,7 +35,10 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_H
+#define _OSX_NTFS_H
 
+#ifdef KERNEL
 
 
 
@@ -71,7 +74,7 @@ static inline ntfs_volume *NTFS_MP(mount_t mp)
 
 __private_extern__ void ntfs_do_postponed_release(ntfs_volume *vol);
 
-
+#endif /* KERNEL */
 
 #include "ntfs_endian.h"
 #include "ntfs_types.h"
@@ -119,8 +122,9 @@ enum {
  * The NTFS mount options header passed in from user space.
  */
 typedef struct {
+#ifndef KERNEL
 	char *fspec;	/* Path of device to mount, consumed by mount(2). */
-
+#endif /* !KERNEL */
 	u8 major_ver;	/* The major version of the mount options structure. */
 	u8 minor_ver;	/* The minor version of the mount options structure. */
 } __attribute__((__packed__)) ntfs_mount_options_header;
@@ -159,3 +163,5 @@ typedef struct {
 	NTFS_MNT_OPTS flags;
 	// TODO: Add NTFS specific mount options here.
 } __attribute__((__packed__)) ntfs_mount_options_1_0;
+
+#endif /* !_OSX_NTFS_H */

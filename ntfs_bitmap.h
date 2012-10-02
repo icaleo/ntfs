@@ -35,6 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _OSX_NTFS_BITMAP_H
+#define _OSX_NTFS_BITMAP_H
 
 
 #include "ntfs_inode.h"
@@ -135,3 +137,4 @@ static inline errno_t ntfs_bitmap_clear_bit(ntfs_inode *ni, const s64 bit)
 	return ntfs_bitmap_clear_run(ni, bit, 1);
 }
 
+#endif /* !_OSX_NTFS_BITMAP_H */
