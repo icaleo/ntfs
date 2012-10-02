@@ -89,12 +89,12 @@ static errno_t ntfs_rl_inc(ntfs_runlist *runlist, unsigned delta)
 	if (new_alloc > alloc) {
 		ntfs_rl_element *new_rl;
 
-		new_rl = OSMalloc(new_alloc, ntfs_malloc_tag);
+		new_rl = malloc(new_alloc, M_NTFS, M_WAITOK);
 		if (!new_rl)
 			return ENOMEM;
 		ntfs_rl_copy(new_rl, runlist->rl, runlist->elements);
 		if (alloc)
-			OSFree(runlist->rl, alloc, ntfs_malloc_tag);
+			free(runlist->rl, M_NTFS);
 		runlist->rl = new_rl;
 		runlist->alloc = new_alloc;
 	}
@@ -162,14 +162,14 @@ static errno_t ntfs_rl_ins(ntfs_runlist *runlist, unsigned pos, unsigned count)
 	 * of the newly allocated array of runlist elements unless @pos is zero
 	 * in which case a single memcpy() is sufficient.
 	 */
-	new_rl = OSMalloc(new_alloc, ntfs_malloc_tag);
+	new_rl = malloc(new_alloc, M_NTFS, M_WAITOK);
 	if (!new_rl)
 		return ENOMEM;
 	ntfs_rl_copy(new_rl, runlist->rl, pos);
 	ntfs_rl_copy(new_rl + pos + count, runlist->rl + pos,
 			runlist->elements - pos);
 	if (alloc)
-		OSFree(runlist->rl, alloc, ntfs_malloc_tag);
+		free(runlist->rl, M_NTFS);
 	runlist->rl = new_rl;
 	runlist->elements = new_elements;
 	runlist->alloc = new_alloc;
@@ -614,7 +614,7 @@ errno_t ntfs_rl_merge(ntfs_runlist *dst_runlist, ntfs_runlist *src_runlist)
 	/* If the source runlist is empty, nothing to do. */
 	if (!s_elements) {
 		if (s_alloc)
-			OSFree(s_rl, s_alloc, ntfs_malloc_tag);
+			free(s_rl, M_NTFS);
 		goto done;
 	}
 	d_rl = dst_runlist->rl;
@@ -634,7 +634,7 @@ errno_t ntfs_rl_merge(ntfs_runlist *dst_runlist, ntfs_runlist *src_runlist)
 		}
 		/* Return the source runlist as the destination. */
 		if (d_alloc)
-			OSFree(d_rl, d_alloc, ntfs_malloc_tag);
+			free(d_rl, M_NTFS);
 		dst_runlist->rl = src_runlist->rl;
 		dst_runlist->elements = src_runlist->elements;
 		dst_runlist->alloc = src_runlist->alloc;
@@ -749,7 +749,7 @@ errno_t ntfs_rl_merge(ntfs_runlist *dst_runlist, ntfs_runlist *src_runlist)
 		return err;
 	}
 	/* Merged, can discard source runlist now. */
-	OSFree(s_rl, s_alloc, ntfs_malloc_tag);
+	free(s_rl, M_NTFS);
 	d_rl = dst_runlist->rl;
 	di = dst_runlist->elements - 1;
 	/* Deal with the end of attribute marker if @s_rl ended after @d_rl. */
@@ -894,7 +894,7 @@ errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol, const ATTR_RECORD *a,
 	rlpos = 0;
 	rlsize = NTFS_ALLOC_BLOCK;
 	/* Allocate NTFS_ALLOC_BLOCK bytes for the runlist. */
-	rl = OSMalloc(rlsize, ntfs_malloc_tag);
+	rl = malloc(rlsize, M_NTFS, M_WAITOK);
 	if (!rl)
 		return ENOMEM;
 	/* Insert unmapped starting element if necessary. */
@@ -912,14 +912,14 @@ errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol, const ATTR_RECORD *a,
 		if (((rlpos + 3) * sizeof(*rl)) > rlsize) {
 			ntfs_rl_element *rl2;
 
-			rl2 = OSMalloc(rlsize + NTFS_ALLOC_BLOCK,
-					ntfs_malloc_tag);
+			rl2 = malloc(rlsize + NTFS_ALLOC_BLOCK,
+					M_NTFS, M_WAITOK);
 			if (!rl2) {
 				err = ENOMEM;
 				goto err;
 			}
 			memcpy(rl2, rl, rlsize);
-			OSFree(rl, rlsize, ntfs_malloc_tag);
+			free(rl, M_NTFS);
 			rl = rl2;
 			rlsize += NTFS_ALLOC_BLOCK;
 		}
@@ -1050,7 +1050,7 @@ errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol, const ATTR_RECORD *a,
 	/* If no existing runlist was specified, we are done. */
 	if (!runlist->elements) {
 		if (runlist->alloc)
-			OSFree(runlist->rl, runlist->alloc, ntfs_malloc_tag);
+			free(runlist->rl, M_NTFS);
 		runlist->rl = rl;
 		runlist->elements = rlpos + 1;
 		runlist->alloc = rlsize;
@@ -1073,7 +1073,7 @@ errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol, const ATTR_RECORD *a,
 		ntfs_error(vol->mp, "Failed to merge runlists.");
 	}
 err:
-	OSFree(rl, rlsize, ntfs_malloc_tag);
+	free(rl, M_NTFS);
 	return err;
 io_err:
 	ntfs_error(vol->mp, "Corrupt mapping pairs array in non-resident "
@@ -1636,10 +1636,10 @@ static void ntfs_rl_shrink(ntfs_runlist *runlist, unsigned new_elements)
 	if (new_alloc < alloc) {
 		ntfs_rl_element *new_rl;
 
-		new_rl = OSMalloc(new_alloc, ntfs_malloc_tag);
+		new_rl = malloc(new_alloc, M_NTFS, M_WAITOK);
 		if (new_rl) {
 			ntfs_rl_copy(new_rl, runlist->rl, new_elements);
-			OSFree(runlist->rl, alloc, ntfs_malloc_tag);
+			free(runlist->rl, M_NTFS);
 			runlist->rl = new_rl;
 			runlist->alloc = new_alloc;
 		} else
@@ -1696,7 +1696,7 @@ errno_t ntfs_rl_truncate_nolock(const ntfs_volume *vol,
 	if (!new_length) {
 		ntfs_debug("Freeing runlist.");
 		if (rl) {
-			OSFree(rl, runlist->alloc, ntfs_malloc_tag);
+			free(rl, M_NTFS);
 			runlist->rl = NULL;
 			runlist->alloc = runlist->elements = 0;
 		}
