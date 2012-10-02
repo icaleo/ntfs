@@ -222,7 +222,7 @@ errno_t ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni, const ntfs_attr *na)
 			na->name != NTFS_SFM_RESOURCEFORK_NAME &&
 			na->name != NTFS_SFM_AFPINFO_NAME) {
 		unsigned i = na->name_len * sizeof(ntfschar);
-		ni->name = OSMalloc(i + sizeof(ntfschar), ntfs_malloc_tag);
+		ni->name = malloc(i + sizeof(ntfschar), M_NTFS, M_WAITOK);
 		if (!ni->name)
 			return ENOMEM;
 		memcpy(ni->name, na->name, i);
@@ -1856,7 +1856,7 @@ info_err:
 		ni->attr_list_size = (u32)ntfs_attr_size(a);
 		ni->attr_list_alloc = (ni->attr_list_size + NTFS_ALLOC_BLOCK -
 				1) & ~(NTFS_ALLOC_BLOCK - 1);
-		ni->attr_list = OSMalloc(ni->attr_list_alloc, ntfs_malloc_tag);
+		ni->attr_list = malloc(ni->attr_list_alloc, M_NTFS, M_WAITOK);
 		if (!ni->attr_list) {
 			ni->attr_list_alloc = 0;
 			ntfs_error(vol->mp, "Not enough memory to allocate "
@@ -2219,12 +2219,11 @@ no_data_attr_special_case:
 		if (err) {
 			ntfs_error(vol->mp, "Failed to load AfpInfo (error "
 					"%d).", err);
-			OSFree(ai_runlist.rl, ai_runlist.alloc,
-					ntfs_malloc_tag);
+			free(ai_runlist.rl, M_NTFS);
 			goto err;
 		}
 		/* We do not need the runlist any more so free it. */
-		OSFree(ai_runlist.rl, ai_runlist.alloc, ntfs_malloc_tag);
+		free(ai_runlist.rl, M_NTFS);
 		/* Finally cache the AFP_AfpInfo data in the base inode. */
 		ntfs_inode_afpinfo_cache(ni, &ai, ai_size);
 	}
@@ -2716,7 +2715,7 @@ done:
 		int new_size;
 
 		new_size = base_ni->attr_nis_alloc + 4 * sizeof(ntfs_inode *);
-		tmp = OSMalloc(new_size, ntfs_malloc_tag);
+		tmp = malloc(new_size, M_NTFS, M_WAITOK);
 		if (!tmp) {
 			ntfs_error(vol->mp, "Failed to allocated internal "
 					"buffer.");
@@ -2728,8 +2727,7 @@ done:
 				memcpy(tmp, base_ni->attr_nis,
 						base_ni->nr_attr_nis *
 						sizeof(ntfs_inode *));
-			OSFree(base_ni->attr_nis, base_ni->attr_nis_alloc,
-					ntfs_malloc_tag);
+			free(base_ni->attr_nis, M_NTFS);
 		}
 		base_ni->attr_nis_alloc = new_size;
 		base_ni->attr_nis = tmp;
@@ -3066,7 +3064,7 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 		int new_size;
 
 		new_size = base_ni->attr_nis_alloc + 4 * sizeof(ntfs_inode *);
-		tmp = OSMalloc(new_size, ntfs_malloc_tag);
+		tmp = malloc(new_size, M_NTFS, M_WAITOK);
 		if (!tmp) {
 			ntfs_error(vol->mp, "Failed to allocated internal "
 					"buffer.");
@@ -3078,8 +3076,7 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 				memcpy(tmp, base_ni->attr_nis,
 						base_ni->nr_attr_nis *
 						sizeof(ntfs_inode *));
-			OSFree(base_ni->attr_nis, base_ni->attr_nis_alloc,
-					ntfs_malloc_tag);
+			free(base_ni->attr_nis, M_NTFS);
 		}
 		base_ni->attr_nis_alloc = new_size;
 		base_ni->attr_nis = tmp;
@@ -3125,7 +3122,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 		
 		for (i = 0; i < ni->nr_extents; i++)
 			ntfs_inode_reclaim(ni->extent_nis[i]);
-		OSFree(ni->extent_nis, ni->extent_alloc, ntfs_malloc_tag);
+		free(ni->extent_nis, M_NTFS);
 	}
 	/*
 	 * If this is an attribute or index inode, detach it from the base
@@ -3161,18 +3158,16 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 		ni->base_attr_nis_lock = NULL;
 	}
 	if (ni->rl.alloc)
-		OSFree(ni->rl.rl, ni->rl.alloc, ntfs_malloc_tag);
+		free(ni->rl.rl, M_NTFS);
 	if (ni->attr_list_alloc)
-		OSFree(ni->attr_list, ni->attr_list_alloc, ntfs_malloc_tag);
+		free(ni->attr_list, M_NTFS);
 	if (ni->attr_list_rl.alloc)
-		OSFree(ni->attr_list_rl.rl, ni->attr_list_rl.alloc,
-				ntfs_malloc_tag);
+		free(ni->attr_list_rl.rl, M_NTFS);
 	ntfs_dirhints_put(ni, 0);
 	if (ni->name_len && ni->name != I30 &&
 			ni->name != NTFS_SFM_RESOURCEFORK_NAME &&
 			ni->name != NTFS_SFM_AFPINFO_NAME)
-		OSFree(ni->name, (ni->name_len + 1) * sizeof(ntfschar),
-				ntfs_malloc_tag);
+		free(ni->name, M_NTFS);
 	/* Remove the inode from the list of inodes in the volume. */
 	lck_mtx_lock(&vol->inodes_lock);
 	LIST_REMOVE(ni, inodes);
@@ -3192,7 +3187,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 	ntfs_rl_deinit(&ni->rl);
 	ntfs_rl_deinit(&ni->attr_list_rl);
 	lck_mtx_destroy(&ni->extent_lock, ntfs_lock_grp);
-	OSFree(ni, sizeof(ntfs_inode), ntfs_malloc_tag);
+	free(ni, M_NTFS);
 	/* If the volume release was postponed, perform it now. */
 	if (do_release)
 		ntfs_do_postponed_release(vol);
@@ -3713,7 +3708,7 @@ static errno_t ntfs_inode_sync_to_mft_record(ntfs_inode *ni)
 		 */
 		size = le32_to_cpu(a->value_length);
 		alloc = offsetof(struct fn_list_entry, fn) + size;
-		next = OSMalloc(alloc, ntfs_malloc_tag);
+		next = malloc(alloc, M_NTFS, M_WAITOK);
 		if (!next) {
 			ntfs_error(vol->mp, ies, 
 					(unsigned long long)ni->mft_no,
@@ -3900,7 +3895,7 @@ put_skip_name:
 		ntfs_index_ctx_put_reuse(ictx);
 skip_name:
 		SLIST_REMOVE_HEAD(&fn_list, list_entry);
-		OSFree(next, next->alloc, ntfs_malloc_tag);
+		free(next, M_NTFS);
 	}
 	if (dir_ni) {
 		lck_rw_unlock_exclusive(&dir_ia_ni->lock);
@@ -3917,7 +3912,7 @@ list_err:
 	while (!SLIST_EMPTY(&fn_list)) {
 		next = SLIST_FIRST(&fn_list);
 		SLIST_REMOVE_HEAD(&fn_list, list_entry);
-		OSFree(next, next->alloc, ntfs_malloc_tag);
+		free(next, M_NTFS);
 	}
 	if (ictx)
 		ntfs_index_ctx_free(ictx);
