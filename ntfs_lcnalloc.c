@@ -171,7 +171,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 	/* Return NULL if @count is zero. */
 	if (!count) {
 		if (runlist->alloc)
-			OSFree(runlist->rl, runlist->alloc, ntfs_malloc_tag);
+			free(runlist->rl, M_NTFS);
 		runlist->rl = NULL;
 		runlist->elements = 0;
 		runlist->alloc = 0;
@@ -343,8 +343,8 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 				ntfs_rl_element *rl2;
 
 				ntfs_debug("Reallocating memory.");
-				rl2 = OSMalloc(rlsize + NTFS_ALLOC_BLOCK,
-						ntfs_malloc_tag);
+				rl2 = malloc(rlsize + NTFS_ALLOC_BLOCK,
+						M_NTFS, M_WAITOK);
 				if (!rl2) {
 					err = ENOMEM;
 					ntfs_error(vol->mp, "Failed to "
@@ -358,7 +358,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 							(lcn + bmp_pos));
 				else {
 					memcpy(rl2, rl, rlsize);
-					OSFree(rl, rlsize, ntfs_malloc_tag);
+					free(rl, M_NTFS);
 				}
 				rl = rl2;
 				rlsize += NTFS_ALLOC_BLOCK;
@@ -815,7 +815,7 @@ out:
 		(void)vnode_put(lcnbmp_ni->vn);
 		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
 		if (runlist->alloc)
-			OSFree(runlist->rl, runlist->alloc, ntfs_malloc_tag);
+			free(runlist->rl, M_NTFS);
 		runlist->rl = rl;
 		runlist->elements = rlpos + 1;
 		runlist->alloc = rlsize;
@@ -844,7 +844,7 @@ out:
 			NVolSetErrors(vol);
 		}
 		/* Free the runlist. */
-		OSFree(rl, rlsize, ntfs_malloc_tag);
+		free(rl, M_NTFS);
 	} else if (err == ENOSPC)
 		ntfs_debug("No space left at all, err ENOSPC, first free lcn "
 				"0x%llx.", (long long)vol->data1_zone_pos);
