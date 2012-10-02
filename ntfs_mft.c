@@ -365,7 +365,7 @@ map_err_out:
 		int new_size;
 
 		new_size = base_ni->extent_alloc + 4 * sizeof(ntfs_inode *);
-		tmp = OSMalloc(new_size, ntfs_malloc_tag);
+		tmp = malloc(new_size, M_NTFS, M_WAITOK);
 		if (!tmp) {
 			ntfs_error(base_ni->vol->mp, "Failed to allocate "
 					"internal buffer.");
@@ -378,8 +378,7 @@ map_err_out:
 				memcpy(tmp, base_ni->extent_nis,
 						base_ni->nr_extents *
 						sizeof(ntfs_inode *));
-			OSFree(base_ni->extent_nis, base_ni->extent_alloc,
-					ntfs_malloc_tag);
+			free(base_ni->extent_nis, M_NTFS);
 		}
 		base_ni->extent_alloc = new_size;
 		base_ni->extent_nis = tmp;
@@ -908,7 +907,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 						"%d).%s", err2, es);
 				NVolSetErrors(vol);
 			}
-			OSFree(runlist.rl, runlist.alloc, ntfs_malloc_tag);
+			free(runlist.rl, M_NTFS);
 			return err;
 		}
 		ntfs_debug("Adding one run to mft bitmap.");
@@ -1370,7 +1369,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 					"cluster(s) (error %d).%s", err2, es);
 			NVolSetErrors(vol);
 		}
-		OSFree(runlist.rl, runlist.alloc, ntfs_malloc_tag);
+		free(runlist.rl, M_NTFS);
 		return err;
 	}
 	ntfs_debug("Allocated %lld clusters.", (long long)nr);
@@ -3083,8 +3082,7 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 			if (base_ni->nr_extents < 0)
 				panic("%s(): base_ni->nr_extents < 0\n",
 						__FUNCTION__);
-			OSFree(base_ni->extent_nis, base_ni->extent_alloc,
-					ntfs_malloc_tag);
+			free(base_ni->extent_nis, M_NTFS);
 			base_ni->extent_alloc = 0;
 		}
 		err = 0;
