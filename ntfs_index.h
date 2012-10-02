@@ -241,7 +241,7 @@ struct _ntfs_index_context {
  */
 static inline ntfs_index_context *ntfs_index_ctx_alloc(void)
 {
-	return OSMalloc(sizeof(ntfs_index_context), ntfs_malloc_tag);
+	return malloc(sizeof(ntfs_index_context), M_NTFS, M_WAITOK);
 }
 
 /**
@@ -315,7 +315,7 @@ static inline void ntfs_index_ctx_disconnect(ntfs_index_context *ictx)
  */
 static inline void ntfs_index_ctx_free(ntfs_index_context *ictx)
 {
-	OSFree(ictx, sizeof(*ictx), ntfs_malloc_tag);
+	free(ictx, M_NTFS);
 }
 
 /**
