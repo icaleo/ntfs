@@ -212,9 +212,9 @@ found_it:
 				u8 len;
 
 				if (!name) {
-					*res_name = name = OSMalloc(
+					*res_name = name = malloc(
 							sizeof(*name),
-							ntfs_malloc_tag);
+							M_NTFS, M_WAITOK);
 					if (!name) {
 						err = ENOMEM;
 						goto put_err;
@@ -228,8 +228,7 @@ found_it:
 						len * sizeof(ntfschar));
 			} else {
 				if (name)
-					OSFree(name, sizeof(*name),
-							ntfs_malloc_tag);
+					free(name, M_NTFS);
 				*res_name = NULL;
 			}
 			*res_mref = le64_to_cpu(ie->indexed_file);
@@ -263,9 +262,9 @@ found_it:
 				u8 len;
 
 				if (!name) {
-					*res_name = name = OSMalloc(
+					*res_name = name = malloc(
 							sizeof(*name),
-							ntfs_malloc_tag);
+							M_NTFS, M_WAITOK);
 					if (!name) {
 						err = ENOMEM;
 						goto put_err;
@@ -474,9 +473,9 @@ found_it2:
 				u8 len;
 
 				if (!name) {
-					*res_name = name = OSMalloc(
+					*res_name = name = malloc(
 							sizeof(*name),
-							ntfs_malloc_tag);
+							M_NTFS, M_WAITOK);
 					if (!name) {
 						err = ENOMEM;
 						goto page_err;
@@ -490,8 +489,7 @@ found_it2:
 						len * sizeof(ntfschar));
 			} else {
 				if (name)
-					OSFree(name, sizeof(*name),
-							ntfs_malloc_tag);
+					free(name, M_NTFS);
 				*res_name = NULL;
 			}
 			*res_mref = le64_to_cpu(ie->indexed_file);
@@ -527,9 +525,9 @@ found_it2:
 				u8 len;
 
 				if (!name) {
-					*res_name = name = OSMalloc(
+					*res_name = name = malloc(
 							sizeof(*name),
-							ntfs_malloc_tag);
+							M_NTFS, M_WAITOK);
 					if (!name) {
 						err = ENOMEM;
 						goto page_err;
@@ -641,7 +639,7 @@ unm_err:
 	ntfs_mft_record_unmap(dir_ni);
 err:
 	if (name)
-		OSFree(name, sizeof(*name), ntfs_malloc_tag);
+		free(name, M_NTFS);
 	lck_rw_unlock_shared(&ia_ni->lock);
 	(void)vnode_put(ia_vn);
 	if (!err)
@@ -848,7 +846,7 @@ static ntfs_dirhint *ntfs_dirhint_get(ntfs_inode *ni, unsigned ofs)
 			 * Allocate a new directory hint.  If the allocation
 			 * fails try to recycle an existing directory hint.
 			 */
-			dh = OSMalloc(sizeof(*dh), ntfs_malloc_tag);
+			dh = malloc(sizeof(*dh), M_NTFS, M_WAITOK);
 			if (dh) {
 				ni->nr_dirhints++;
 				need_remove = FALSE;
@@ -858,7 +856,7 @@ static ntfs_dirhint *ntfs_dirhint_get(ntfs_inode *ni, unsigned ofs)
 			/* Recycle the last, i.e. oldest, directory hint. */
 			dh = TAILQ_LAST(&ni->dirhint_list, ntfs_dirhint_head);
 			if (dh && dh->fn_size)
-				OSFree(dh->fn, dh->fn_size, ntfs_malloc_tag);
+				free(dh->fn, M_NTFS);
 		}
 	}
 	/*
@@ -898,8 +896,8 @@ static void ntfs_dirhint_put(ntfs_inode *ni, ntfs_dirhint *dh)
 	TAILQ_REMOVE(&ni->dirhint_list, dh, link);
 	ni->nr_dirhints--;
 	if (dh->fn_size)
-		OSFree(dh->fn, dh->fn_size, ntfs_malloc_tag);
-	OSFree(dh, sizeof(*dh), ntfs_malloc_tag);
+		free(dh->fn, M_NTFS);
+	free(dh, M_NTFS);
 }
 
 /**
@@ -1433,8 +1431,8 @@ err:
 		size = le16_to_cpu(ictx->entry->key_length);
 		if (dh->fn_size != size) {
 			if (dh->fn_size)
-				OSFree(dh->fn, dh->fn_size, ntfs_malloc_tag);
-			dh->fn = OSMalloc(size, ntfs_malloc_tag);
+				free(dh->fn, M_NTFS);
+			dh->fn = malloc(size, M_NTFS, M_WAITOK);
 			if (!dh->fn) {
 				/*
 				 * Not enough memory to set up the directory
