@@ -36,8 +36,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_ATTR_LIST_H
-#define _OSX_NTFS_ATTR_LIST_H
 
 
 #include "ntfs_attr.h"
@@ -108,4 +106,3 @@ static inline void ntfs_attr_list_entry_delete(ntfs_inode *ni,
 			le16_to_cpu(target_entry->length)));
 }
 
-#endif /* !_OSX_NTFS_ATTR_LIST_H */

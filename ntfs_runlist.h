@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_RUNLIST_H
-#define _OSX_NTFS_RUNLIST_H
 
 
 
@@ -181,4 +179,3 @@ __private_extern__ errno_t ntfs_rl_set(ntfs_volume *vol,
 __private_extern__ s64 ntfs_rl_get_nr_real_clusters(ntfs_runlist *runlist,
 		const VCN start_vcn, s64 cnt);
 
-#endif /* !_OSX_NTFS_RUNLIST_H */

@@ -36,8 +36,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_SECURE_H
-#define _OSX_NTFS_SECURE_H
 
 
 #include "ntfs_types.h"
@@ -101,4 +99,3 @@ __private_extern__ errno_t ntfs_next_security_id_init(ntfs_volume *vol,
 __private_extern__ errno_t ntfs_default_security_id_init(ntfs_volume *vol,
 		struct vnode_attr *va);
 
-#endif /* _OSX_NTFS_SECURE_H */

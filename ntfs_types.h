@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_TYPES_H
-#define _OSX_NTFS_TYPES_H
 
 
 
@@ -108,4 +106,3 @@ typedef sle64 leUSN;
 /* Our boolean type. */
 typedef boolean_t BOOL;
 
-#endif /* !_OSX_NTFS_TYPES_H */

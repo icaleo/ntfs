@@ -36,8 +36,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_USNJRNL_H
-#define _OSX_NTFS_USNJRNL_H
 
 
 #include "ntfs_types.h"
@@ -215,4 +213,3 @@ typedef struct {
 
 __private_extern__ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol);
 
-#endif /* _OSX_NTFS_USNJRNL_H */

@@ -36,8 +36,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_QUOTA_H
-#define _OSX_NTFS_QUOTA_H
 
 
 #include "ntfs_types.h"
@@ -45,4 +43,3 @@
 
 __private_extern__ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol);
 
-#endif /* _OSX_NTFS_QUOTA_H */

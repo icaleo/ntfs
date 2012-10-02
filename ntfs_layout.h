@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_LAYOUT_H
-#define _OSX_NTFS_LAYOUT_H
 
 #include "ntfs_endian.h"
 #include "ntfs_types.h"
@@ -2612,4 +2610,3 @@ typedef struct {
 	} __attribute__((__packed__));
 } __attribute__((__packed__)) INTX_FILE;
 
-#endif /* !_OSX_NTFS_LAYOUT_H */

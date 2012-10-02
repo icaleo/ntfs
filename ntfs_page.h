@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_PAGE_H
-#define _OSX_NTFS_PAGE_H
 
 
 #include "ntfs_inode.h"
@@ -114,4 +112,3 @@ __private_extern__ void ntfs_page_unmap(ntfs_inode *ni, upl_t upl,
 __private_extern__ void ntfs_page_dump(ntfs_inode *ni, upl_t upl,
 		upl_page_info_array_t pl);
 
-#endif /* !_OSX_NTFS_PAGE_H */

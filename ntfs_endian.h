@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_ENDIAN_H
-#define _OSX_NTFS_ENDIAN_H
 
 
 #include "ntfs_types.h"
@@ -192,4 +190,3 @@ static inline sle64 cpu_to_sle64p(s64 *x)
 #define const_cpu_to_sle64(x)	\
 		((sle64)(OSSwapHostToLittleConstInt64(((u64)(x)))))
 
-#endif /* !_OSX_NTFS_ENDIAN_H */

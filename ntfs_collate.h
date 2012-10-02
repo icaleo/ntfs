@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_COLLATE_H
-#define _OSX_NTFS_COLLATE_H
 
 #include "ntfs_layout.h"
 #include "ntfs_types.h"
@@ -62,4 +60,3 @@ __private_extern__ int ntfs_collate(ntfs_volume *vol, COLLATION_RULE cr,
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len);
 
-#endif /* _OSX_NTFS_COLLATE_H */

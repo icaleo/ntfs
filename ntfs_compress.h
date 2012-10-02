@@ -36,8 +36,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_COMPRESS_H
-#define _OSX_NTFS_COMPRESS_H
 
 
 
@@ -48,4 +46,3 @@ __private_extern__ errno_t ntfs_read_compressed(ntfs_inode *ni,
 		ntfs_inode *raw_ni, s64 ofs, const int start_count,
 		u8 *dst_start, upl_page_info_t *pl, int ioflags);
 
-#endif /* !_OSX_NTFS_COMPRESS_H */

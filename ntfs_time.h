@@ -35,8 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_TIME_H
-#define _OSX_NTFS_TIME_H
 
 
 #include "ntfs_endian.h"
@@ -138,4 +136,3 @@ static inline struct timespec ntfs2utc(const sle64 time)
 	return ts;
 }
 
-#endif /* _OSX_NTFS_TIME_H */
