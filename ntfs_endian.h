@@ -38,7 +38,6 @@
 #ifndef _OSX_NTFS_ENDIAN_H
 #define _OSX_NTFS_ENDIAN_H
 
-#include <libkern/OSByteOrder.h>
 
 #include "ntfs_types.h"
 

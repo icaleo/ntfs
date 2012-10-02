@@ -35,21 +35,9 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#include <sys/cdefs.h>
 
-#include <sys/errno.h>
-#include <sys/kernel_types.h>
-#include <sys/malloc.h>
-#include <sys/mount.h>
-#include <sys/queue.h>
-#include <sys/systm.h>
-#include <sys/ucred.h>
-#include <sys/vnode.h>
 
-#include <libkern/OSAtomic.h>
-#include <libkern/OSMalloc.h>
 
-#include <kern/locks.h>
 
 #include "ntfs.h"
 #include "ntfs_debug.h"

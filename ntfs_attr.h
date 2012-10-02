@@ -38,7 +38,6 @@
 #ifndef _OSX_NTFS_ATTR_H
 #define _OSX_NTFS_ATTR_H
 
-#include <sys/errno.h>
 
 /* Forward declaration. */
 typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;

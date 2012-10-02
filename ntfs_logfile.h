@@ -39,7 +39,6 @@
 #ifndef _OSX_NTFS_LOGFILE_H
 #define _OSX_NTFS_LOGFILE_H
 
-#include <sys/errno.h>
 
 #include "ntfs_endian.h"
 #include "ntfs_inode.h"

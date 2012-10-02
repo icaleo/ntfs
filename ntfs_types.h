@@ -38,9 +38,7 @@
 #ifndef _OSX_NTFS_TYPES_H
 #define _OSX_NTFS_TYPES_H
 
-#include <sys/types.h>
 
-#include <mach/boolean.h>
 
 /* Define our fixed size types. */
 typedef u_int8_t u8;

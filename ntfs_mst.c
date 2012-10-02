@@ -35,7 +35,6 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#include <sys/errno.h>
 
 #include "ntfs.h"
 #include "ntfs_endian.h"

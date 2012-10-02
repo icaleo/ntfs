@@ -39,7 +39,6 @@
 #ifndef _OSX_NTFS_QUOTA_H
 #define _OSX_NTFS_QUOTA_H
 
-#include <sys/errno.h>
 
 #include "ntfs_types.h"
 #include "ntfs_volume.h"

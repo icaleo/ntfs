@@ -38,7 +38,6 @@
 #ifndef _OSX_NTFS_SFM_H
 #define _OSX_NTFS_SFM_H
 
-#include <sys/time.h>
 
 #include "ntfs_endian.h"
 #include "ntfs_types.h"

@@ -39,12 +39,7 @@
 #ifndef _OSX_NTFS_HASH_H
 #define _OSX_NTFS_HASH_H
 
-#include <sys/cdefs.h>
-#include <sys/errno.h>
-#include <sys/mount.h>
-#include <sys/queue.h>
 
-#include <kern/locks.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_volume.h"

@@ -38,11 +38,8 @@
 #ifndef _OSX_NTFS_INDEX_H
 #define _OSX_NTFS_INDEX_H
 
-#include <sys/errno.h>
 
-#include <libkern/OSMalloc.h>
 
-#include <kern/debug.h>
 
 /* Foward declaration. */
 typedef struct _ntfs_index_context ntfs_index_context;

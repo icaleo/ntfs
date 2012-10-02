@@ -38,9 +38,7 @@
 #ifndef _OSX_NTFS_RUNLIST_H
 #define _OSX_NTFS_RUNLIST_H
 
-#include <sys/errno.h>
 
-#include <kern/locks.h>
 
 #include "ntfs_types.h"
 

@@ -35,13 +35,9 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#include <sys/errno.h>
 
-#include <string.h>
 
-#include <libkern/OSMalloc.h>
 
-#include <kern/sched_prim.h>
 
 #include "ntfs.h"
 #include "ntfs_attr.h"

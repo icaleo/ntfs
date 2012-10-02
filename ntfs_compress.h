@@ -39,9 +39,7 @@
 #ifndef _OSX_NTFS_COMPRESS_H
 #define _OSX_NTFS_COMPRESS_H
 
-#include <sys/errno.h>
 
-#include <mach/memory_object_types.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_types.h"

@@ -39,9 +39,7 @@
 #ifndef _OSX_NTFS_LCNALLOC_H
 #define _OSX_NTFS_LCNALLOC_H
 
-#include <sys/errno.h>
 
-#include <kern/locks.h>
 
 #include "ntfs_attr.h"
 #include "ntfs_inode.h"

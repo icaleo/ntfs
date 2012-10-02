@@ -38,12 +38,8 @@
 #ifndef _OSX_NTFS_VOLUME_H
 #define _OSX_NTFS_VOLUME_H
 
-#include <sys/mount.h>
-#include <sys/types.h>
 
-#include <libkern/OSAtomic.h>
 
-#include <kern/locks.h>
 
 /* Forward declaration. */
 typedef struct _ntfs_volume ntfs_volume;

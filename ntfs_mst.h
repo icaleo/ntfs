@@ -39,7 +39,6 @@
 #ifndef _OSX_NTFS_MST_H
 #define _OSX_NTFS_MST_H
 
-#include <sys/errno.h>
 
 #include "ntfs_layout.h"
 #include "ntfs_types.h"

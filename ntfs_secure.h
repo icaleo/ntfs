@@ -39,9 +39,6 @@
 #ifndef _OSX_NTFS_SECURE_H
 #define _OSX_NTFS_SECURE_H
 
-#include <sys/errno.h>
-#include <sys/ucred.h>
-#include <sys/vnode.h>
 
 #include "ntfs_types.h"
 #include "ntfs_endian.h"

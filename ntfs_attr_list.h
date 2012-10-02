@@ -39,7 +39,6 @@
 #ifndef _OSX_NTFS_ATTR_LIST_H
 #define _OSX_NTFS_ATTR_LIST_H
 
-#include <sys/errno.h>
 
 #include "ntfs_attr.h"
 #include "ntfs_endian.h"

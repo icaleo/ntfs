@@ -38,7 +38,6 @@
 #ifndef _OSX_NTFS_MFT_H
 #define _OSX_NTFS_MFT_H
 
-#include <sys/errno.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_layout.h"

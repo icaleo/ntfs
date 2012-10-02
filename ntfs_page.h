@@ -38,8 +38,6 @@
 #ifndef _OSX_NTFS_PAGE_H
 #define _OSX_NTFS_PAGE_H
 
-#include <sys/errno.h>
-#include <sys/ubc.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_types.h"

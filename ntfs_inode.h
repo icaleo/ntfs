@@ -38,21 +38,8 @@
 #ifndef _OSX_NTFS_INODE_H
 #define _OSX_NTFS_INODE_H
 
-#include <sys/buf.h>
-#include <sys/errno.h>
-#include <sys/kernel_types.h>
-#include <sys/proc.h>
-#include <sys/queue.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/ucred.h>
-#include <sys/vnode.h>
-#include <sys/xattr.h>
 
-#include <libkern/OSTypes.h>
 
-#include <kern/debug.h>
-#include <kern/locks.h>
 
 /* Forward declarations. */
 typedef struct _ntfs_inode ntfs_inode;
