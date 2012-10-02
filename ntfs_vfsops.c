@@ -708,7 +708,7 @@ static errno_t ntfs_mft_inode_get(ntfs_volume *vol)
 	ni->gid = 0;
 	ni->mode = S_IFREG;
 	/* Allocate enough memory to read the first mft record. */
-	m = OSMalloc(vol->mft_record_size, ntfs_malloc_tag);
+	m = malloc(vol->mft_record_size, M_NTFS, M_WAITOK);
 	if (!m) {
 		ntfs_error(vol->mp, "Failed to allocate buffer for $MFT "
 				"record 0.");
@@ -864,7 +864,7 @@ info_err:
 		ni->attr_list_size = (u32)ntfs_attr_size(a);
 		ni->attr_list_alloc = (ni->attr_list_size + NTFS_ALLOC_BLOCK -
 				1) & ~(NTFS_ALLOC_BLOCK - 1);
-		ni->attr_list = OSMalloc(ni->attr_list_alloc, ntfs_malloc_tag);
+		ni->attr_list = malloc(ni->attr_list_alloc, M_NTFS, M_WAITOK);
 		if (!ni->attr_list) {
 			ni->attr_list_alloc = 0;
 			ntfs_error(vol->mp, "Not enough memory to allocate "
@@ -1123,7 +1123,7 @@ info_err:
 		goto io_err;
 	}
 	ntfs_attr_search_ctx_put(ctx);
-	OSFree(m, vol->mft_record_size, ntfs_malloc_tag);
+	free(m, M_NTFS);
 	ntfs_debug("Done.");
 	return 0;
 em_err:
@@ -1135,7 +1135,7 @@ err:
 	if (ctx)
 		ntfs_attr_search_ctx_put(ctx);
 	if (m)
-		OSFree(m, vol->mft_record_size, ntfs_malloc_tag);
+		free(m, M_NTFS);
 	/* vol->mft_ni will be cleaned up by the caller. */
 	if (!vol->mft_ni)
 		ntfs_inode_reclaim(ni);
@@ -1395,7 +1395,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 	rec_size = vol->mft_record_size;
 	/* Allocate a buffer and read all mft mirror records into it. */
 	alloc_size = nr_mirr_recs << vol->mft_record_size_shift;
-	mirr_start = OSMalloc(alloc_size, ntfs_malloc_tag);
+	mirr_start = malloc(alloc_size, M_NTFS, M_WAITOK);
 	if (!mirr_start) {
 		ntfs_error(vol->mp, "Failed to allocate temporary mft mirror "
 				"buffer.");
@@ -1541,7 +1541,7 @@ unlock:
 	lck_rw_unlock_shared(&ni->lock);
 	(void)vnode_put(ni->vn);
 err:
-	OSFree(mirr_start, alloc_size, ntfs_malloc_tag);
+	free(mirr_start, M_NTFS);
 	return err;
 unmap:
 	err2 = buf_unmap(buf);
@@ -1591,7 +1591,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 		goto err;
 	}
 	/* Allocate memory to hold the $UpCase data. */
-	vol->upcase = OSMalloc(data_size, ntfs_malloc_tag);
+	vol->upcase = malloc(data_size, M_NTFS, M_WAITOK);
 	if (!vol->upcase) {
 		err = ENOMEM;
 		goto err;
@@ -1630,7 +1630,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 			if (vol->upcase[u] != ntfs_default_upcase[u])
 				break;
 		if (u == max_size) {
-			OSFree(vol->upcase, data_size, ntfs_malloc_tag);
+			free(vol->upcase, M_NTFS);
 			vol->upcase = ntfs_default_upcase;
 			vol->upcase_len = ntfs_default_upcase_size >>
 					NTFSCHAR_SIZE_SHIFT;
@@ -1646,7 +1646,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 	return 0;
 err:
 	if (vol->upcase) {
-		OSFree(vol->upcase, data_size, ntfs_malloc_tag);
+		free(vol->upcase, M_NTFS);
 		vol->upcase = NULL;
 		vol->upcase_len = 0;
 	}
@@ -1708,7 +1708,7 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 		err = EINVAL;
 		goto err;
 	}
-	vol->attrdef = OSMalloc(data_size, ntfs_malloc_tag);
+	vol->attrdef = malloc(data_size, M_NTFS, M_WAITOK);
 	if (!vol->attrdef) {
 		err = ENOMEM;
 		goto err;
@@ -1736,7 +1736,7 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 	return 0;
 err:
 	if (vol->attrdef) {
-		OSFree(vol->attrdef, data_size, ntfs_malloc_tag);
+		free(vol->attrdef, M_NTFS);
 		vol->attrdef = NULL;
 	}
 	if (ni) {
@@ -1824,7 +1824,7 @@ info_err:
 		ntfs_debug("Volume has no name, using empty string.");
 no_name:
 		/* No volume name, i.e. the name is "". */
-		vol->name = OSMalloc(sizeof(char), ntfs_malloc_tag);
+		vol->name = malloc(sizeof(char), M_NTFS, M_WAITOK);
 		if (!vol->name) {
 			ntfs_error(vol->mp, "Failed to allocate memory for "
 					"volume name.");
@@ -1970,7 +1970,7 @@ static errno_t ntfs_windows_hibernation_status_check(ntfs_volume *vol,
 	}
 	/* We do not care for the type of match that was found. */
 	if (name)
-		OSFree(name, sizeof(*name), ntfs_malloc_tag);
+		free(name, M_NTFS);
 	/* Get the inode. */
 	err = ntfs_inode_get(vol, MREF(mref), FALSE, LCK_RW_TYPE_SHARED, &ni,
 			vol->root_ni->vn, NULL);
@@ -2298,7 +2298,7 @@ static errno_t ntfs_objid_load(ntfs_volume *vol)
 	}
 	/* We do not care for the type of match that was found. */
 	if (name)
-		OSFree(name, sizeof(*name), ntfs_malloc_tag);
+		free(name, M_NTFS);
 	/* Get the inode. */
 	err = ntfs_inode_attach(vol, MREF(mref), &ni, vol->extend_ni->vn);
 	if (err) {
@@ -2366,7 +2366,7 @@ static errno_t ntfs_quota_load(ntfs_volume *vol)
 	}
 	/* We do not care for the type of match that was found. */
 	if (name)
-		OSFree(name, sizeof(*name), ntfs_malloc_tag);
+		free(name, M_NTFS);
 	/* Get the inode. */
 	err = ntfs_inode_attach(vol, MREF(mref), &vol->quota_ni,
 			vol->extend_ni->vn);
@@ -2450,7 +2450,7 @@ not_enabled:
 	}
 	/* We do not care for the type of match that was found. */
 	if (name)
-		OSFree(name, sizeof(*name), ntfs_malloc_tag);
+		free(name, M_NTFS);
 	/* Get the inode. */
 	err = ntfs_inode_attach(vol, MREF(mref), &ni, vol->extend_ni->vn);
 	if (err) {
@@ -2783,8 +2783,7 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 			if (!ntfs_logfile_is_clean(ni, rp))
 				err = EINVAL;
 			if (rp)
-				OSFree(rp, le32_to_cpu(rp->system_page_size),
-						ntfs_malloc_tag);
+				free(rp, M_NTFS);
 		}
 	}
 	if (err) {
@@ -3407,8 +3406,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 		 * away if we had the only reference.
 		 */
 		if (!--ntfs_default_upcase_users) {
-			OSFree(ntfs_default_upcase, ntfs_default_upcase_size,
-					ntfs_malloc_tag);
+			free(ntfs_default_upcase, M_NTFS);
 			ntfs_default_upcase = NULL;
 		}
 	}
@@ -3418,23 +3416,20 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 		 * away if we had the only reference.
 		 */
 		if (!--ntfs_compression_users) {
-			OSFree(ntfs_compression_buffer,
-					ntfs_compression_buffer_size,
-					ntfs_malloc_tag);
+			free(ntfs_compression_buffer, M_NTFS);
 			ntfs_compression_buffer = NULL;
 		}
 	}
 	lck_mtx_unlock(&ntfs_lock);
 	/* If we loaded the attribute definitions table, throw it away now. */
 	if (vol->attrdef)
-		OSFree(vol->attrdef, vol->attrdef_size, ntfs_malloc_tag);
+		free(vol->attrdef, M_NTFS);
 	/* If we used a volume specific upcase table, throw it away now. */
 	if (vol->upcase)
-		OSFree(vol->upcase, vol->upcase_len << NTFSCHAR_SIZE_SHIFT,
-				ntfs_malloc_tag);
+		free(vol->upcase, M_NTFS);
 	/* If we cached a volume name, throw it away now. */
 	if (vol->name)
-		OSFree(vol->name, vol->name_size, ntfs_malloc_tag);
+		free(vol->name, M_NTFS);
 	/* Deinitialize the ntfs_volume locks. */
 	lck_rw_destroy(&vol->mftbmp_lock, ntfs_lock_grp);
 	lck_rw_destroy(&vol->lcnbmp_lock, ntfs_lock_grp);
@@ -3443,7 +3438,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
 	/* Finally, free the ntfs volume. */
-	OSFree(vol, sizeof(ntfs_volume), ntfs_malloc_tag);
+	free(vol, M_NTFS);
 	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
 }
 
@@ -3640,7 +3635,7 @@ no_mft:
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
 	/* Finally, free the ntfs volume. */
-	OSFree(vol, sizeof(ntfs_volume), ntfs_malloc_tag);
+	free(vol, M_NTFS);
 unload:
 	err = 0;
 	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
@@ -4081,7 +4076,7 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 	 * Allocate and initialize an ntfs volume and attach it to the vfs
 	 * mount.
 	 */
-	vol = OSMalloc(sizeof(ntfs_volume), ntfs_malloc_tag);
+	vol = malloc(sizeof(ntfs_volume), M_NTFS, M_WAITOK);
 	if (!vol) {
 		ntfs_error(mp, "Failed to allocate ntfs volume buffer.");
 		err = ENOMEM;
@@ -4267,9 +4262,9 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 		 */
 		if (vol->cluster_size <= 4096) {
 			if (!ntfs_compression_buffer) {
-				ntfs_compression_buffer = OSMalloc(
+				ntfs_compression_buffer = malloc(
 						ntfs_compression_buffer_size,
-						ntfs_malloc_tag);
+						M_NTFS, M_WAITOK);
 				if (!ntfs_compression_buffer) {
 					// FIXME: We could continue with
 					// compression disabled.  But do we
@@ -4294,8 +4289,8 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 	}
 	/* Generate the global default upcase table if necessary. */
 	if (!ntfs_default_upcase) {
-		ntfs_default_upcase = OSMalloc(ntfs_default_upcase_size,
-				ntfs_malloc_tag);
+		ntfs_default_upcase = malloc(ntfs_default_upcase_size,
+				M_NTFS, M_WAITOK);
 		if (!ntfs_default_upcase) {
 			// FIXME: We could continue without a default upcase
 			// table.  But do we want to do that given the system
@@ -4326,8 +4321,7 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 	 */
 	lck_mtx_lock(&ntfs_lock);
 	if (!--ntfs_default_upcase_users) {
-		OSFree(ntfs_default_upcase, ntfs_default_upcase_size,
-				ntfs_malloc_tag);
+		free(ntfs_default_upcase, M_NTFS);
 		ntfs_default_upcase = NULL;
 	}
 	lck_mtx_unlock(&ntfs_lock);
@@ -5126,7 +5120,7 @@ static errno_t ntfs_volume_rename(ntfs_volume *vol, char *name)
 		}
 	}
 	/* Make a copy of the new volume name to be placed in @vol->name. */
-	utf8_name = OSMalloc(utf8_name_size, ntfs_malloc_tag);
+	utf8_name = malloc(utf8_name_size, M_NTFS, M_WAITOK);
 	if (!utf8_name) {
 		ntfs_error(vol->mp, "Not enough memory to make a copy of the "
 				"new name.");
@@ -5295,7 +5289,7 @@ retry_resize:
 	}
 	/* Free the no longer needed temporary copy of the new name. */
 	if (ntfs_name)
-		OSFree(ntfs_name, ntfs_name_size, ntfs_malloc_tag);
+		free(ntfs_name, M_NTFS);
 	/* Mark the mft record dirty to ensure it gets written out. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 done:
@@ -5318,7 +5312,7 @@ done:
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(ni);
 	(void)vnode_put(ni->vn);
-	OSFree(name, ntfs_name_size, ntfs_malloc_tag);
+	free(name, M_NTFS);
 	ntfs_debug("Done.");
 	return 0;
 name_err:
@@ -5333,9 +5327,9 @@ put_err:
 	(void)vnode_put(ni->vn);
 err:
 	if (utf8_name)
-		OSFree(utf8_name, utf8_name_size, ntfs_malloc_tag);
+		free(utf8_name, M_NTFS);
 	if (ntfs_name)
-		OSFree(ntfs_name, ntfs_name_size, ntfs_malloc_tag);
+		free(ntfs_name, M_NTFS);
 	return err;
 }
 
@@ -5500,7 +5494,7 @@ lck_err:
 	ntfs_error(NULL, "vfs_fsadd() failed (error %d).", (int)err);
 	ntfs_inode_hash_deinit();
 hash_err:
-	OSFree(ntfs_file_sds_entry, 0x60 * 4, ntfs_malloc_tag);
+	free(ntfs_file_sds_entry, M_NTFS);
 	ntfs_file_sds_entry = NULL;
 sds_err:
 	ntfs_debug_deinit();
@@ -5550,7 +5544,7 @@ kern_return_t ntfs_module_stop(kmod_info_t *ki __unused, void *data __unused)
 		return KERN_FAILURE;
 	}
 	ntfs_inode_hash_deinit();
-	OSFree(ntfs_file_sds_entry, 0x60 * 4, ntfs_malloc_tag);
+	free(ntfs_file_sds_entry, M_NTFS);
 	ntfs_file_sds_entry = NULL;
 	ntfs_debug("Done.");
 	/*
