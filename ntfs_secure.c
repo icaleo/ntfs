@@ -162,7 +162,7 @@ errno_t ntfs_default_sds_entries_init(void)
 	 * this here as we otherwise would not know the size until we have
 	 * generated the SDS entry.
 	 */
-	sds = OSMalloc(0x60 * 4, ntfs_malloc_tag);
+	sds = malloc(0x60 * 4, M_NTFS, M_WAITOK);
 	if (!sds) {
 		ntfs_error(NULL, "Failed to allocate memory for the default "
 				"$Secure/$DATA/$SDS entries.");
