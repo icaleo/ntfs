@@ -255,7 +255,7 @@ void ntfs_upcase_name(ntfschar *name, u32 name_len, const ntfschar *upcase,
  * as described at http://support.microsoft.com/kb/q117258/.
  *
  * If *@outs is NULL, this function allocates the string and the caller is
- * responsible for calling OSFree(*@outs, *@outs_size, ntfs_malloc_tag); when
+ * responsible for calling free(*@outs, M_NTFS); when
  * finished with it.
  *
  * If *@outs is not NULL, it is used as the destination buffer and the caller
@@ -289,7 +289,7 @@ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 	} else {
 		/* Allocate the maximum length NTFS string. */
 		ntfs_size = NTFS_MAX_NAME_LEN << NTFSCHAR_SIZE_SHIFT;
-		ntfs = OSMalloc(ntfs_size, ntfs_malloc_tag);
+		ntfs = malloc(ntfs_size, M_NTFS, M_WAITOK);
 		if (!ntfs) {
 			ntfs_error(vol->mp, "Failed to allocate memory for "
 					"output string.");
@@ -328,7 +328,7 @@ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 	return res_size;
 err:
 	if (!*outs)
-		OSFree(ntfs, ntfs_size, ntfs_malloc_tag);
+		free(ntfs, M_NTFS);
 	return -err;
 }
 
@@ -349,7 +349,7 @@ err:
  * http://support.microsoft.com/kb/q117258/.
  *
  * If *@outs is NULL, this function allocates the string and the caller is
- * responsible for calling OSFree(*@outs, *@outs_size, ntfs_malloc_tag); when
+ * responsible for calling free(*@outs, M_NTFS); when
  * finished with it.
  *
  * On success the function returns the number of bytes written to the output
@@ -384,7 +384,7 @@ signed ntfs_to_utf8(const ntfs_volume *vol, const ntfschar *ins,
 		utf8_size = utf8_encodelen(ins, ins_size, 0, UTF_DECOMPOSED |
 				UTF_LITTLE_ENDIAN | UTF_SFM_CONVERSIONS) + 1;
 		/* Allocate buffer for the converted string. */
-		utf8 = OSMalloc(utf8_size, ntfs_malloc_tag);
+		utf8 = malloc(utf8_size, M_NTFS, M_WAITOK);
 		if (!utf8) {
 			ntfs_error(vol->mp, "Failed to allocate memory for "
 					"output string.");
@@ -426,7 +426,7 @@ signed ntfs_to_utf8(const ntfs_volume *vol, const ntfschar *ins,
 	return res_size;
 err:
 	if (!*outs)
-		OSFree(utf8, utf8_size, ntfs_malloc_tag);
+		free(utf8, M_NTFS);
 	return -err;
 }
 
