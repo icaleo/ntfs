@@ -5411,7 +5411,7 @@ lck_grp_t *ntfs_lock_grp;
 lck_attr_t *ntfs_lock_attr;
 
 /* A tag to allow allocation and freeing of memory. */
-OSMallocTag ntfs_malloc_tag;
+MALLOC_DEFINE(M_NTFS, "ntfs", "NTFS structures");
 
 static vfstable_t ntfs_vfstable;
 
