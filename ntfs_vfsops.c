@@ -69,7 +69,7 @@ const char ntfs_please_email[] = "Please email "
 		"this message.  Thank you.";
 
 /* A driver wide lock protecting the below global data structures. */
-static lck_mtx_t ntfs_lock;
+static struct lock ntfs_lock;
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_compression_users;
@@ -5415,52 +5415,15 @@ MALLOC_DEFINE(M_NTFS, "ntfs", "NTFS structures");
 
 static vfstable_t ntfs_vfstable;
 
-extern kern_return_t ntfs_module_start(kmod_info_t *ki __unused,
-		void *data __unused);
-kern_return_t ntfs_module_start(kmod_info_t *ki __unused, void *data __unused)
+
+static int ntfs_init(struct vfsconf *vcp)
 {
 	errno_t err;
 	struct vfs_fsentry vfe;
 
-	printf("NTFS driver " VERSION " [Flags: R/W"
-#ifdef DEBUG
-			" DEBUG"
-#endif
-			"].\n");
-	/* This should never happen. */
-	if (ntfs_lock_grp_attr || ntfs_lock_grp || ntfs_lock_attr ||
-			ntfs_malloc_tag)
-		panic("%s(): Lock(s) and/or malloc tag already initialized.\n",
-				__FUNCTION__);
-	/* First initialize the lock group so we can initialize debugging. */
-	ntfs_lock_grp_attr = lck_grp_attr_alloc_init();
-	if (!ntfs_lock_grp_attr) {
-lck_err:
-		printf("NTFS: Failed to allocate a lock element.\n");
-		goto dbg_err;
-	}
-#ifdef DEBUG
-	lck_grp_attr_setstat(ntfs_lock_grp_attr);
-#endif
-	ntfs_lock_grp = lck_grp_alloc_init("com.apple.filesystems.ntfs",
-			ntfs_lock_grp_attr);
-	if (!ntfs_lock_grp)
-		goto lck_err;
-	ntfs_lock_attr = lck_attr_alloc_init();
-	if (!ntfs_lock_attr)
-		goto lck_err;
-#ifdef DEBUG
-	lck_attr_setdebug(ntfs_lock_attr);
-#endif
-	/* Allocate a tag so we can allocate memory. */
-	ntfs_malloc_tag = OSMalloc_Tagalloc("com.apple.filesystems.ntfs",
-			OSMT_DEFAULT);
-	if (!ntfs_malloc_tag) {
-		printf("NTFS: OSMalloc_Tagalloc() failed.\n");
-		goto dbg_err;
-	}
-	/* Initialize the driver wide lock. */
-	lck_mtx_init(&ntfs_lock, ntfs_lock_grp, ntfs_lock_attr);
+	/* First initialize the lockmgr */
+	lockinit(&ntfs_lock, PINOD, "ntfs_lock", 0, 0);
+
 	/*
 	 * This call must happen before we can use ntfs_debug(),
 	 * ntfs_warning(), and ntfs_error().
@@ -5489,7 +5452,7 @@ lck_err:
 	err = vfs_fsadd(&vfe, &ntfs_vfstable);
 	if (!err) {
 		ntfs_debug("NTFS driver registered successfully.");
-		return KERN_SUCCESS;
+		return 0;
 	}
 	ntfs_error(NULL, "vfs_fsadd() failed (error %d).", (int)err);
 	ntfs_inode_hash_deinit();
@@ -5498,30 +5461,13 @@ hash_err:
 	ntfs_file_sds_entry = NULL;
 sds_err:
 	ntfs_debug_deinit();
-	lck_mtx_destroy(&ntfs_lock, ntfs_lock_grp);
+	lockdestroy(&ntfs_lock);
 dbg_err:
-	if (ntfs_malloc_tag) {
-		OSMalloc_Tagfree(ntfs_malloc_tag);
-		ntfs_malloc_tag = NULL;
-	}
-	if (ntfs_lock_attr) {
-		lck_attr_free(ntfs_lock_attr);
-		ntfs_lock_attr = NULL;
-	}
-	if (ntfs_lock_grp) {
-		lck_grp_free(ntfs_lock_grp);
-		ntfs_lock_grp = NULL;
-	}
-	if (ntfs_lock_grp_attr) {
-		lck_grp_attr_free(ntfs_lock_grp_attr);
-		ntfs_lock_grp_attr = NULL;
-	}
 	printf("NTFS: Failed to register the NTFS driver.\n");
 	return KERN_FAILURE;
 }
 
-extern kern_return_t ntfs_module_stop(kmod_info_t *ki __unused,
-		void *data __unused);
+
 kern_return_t ntfs_module_stop(kmod_info_t *ki __unused, void *data __unused)
 {
 	errno_t err;
