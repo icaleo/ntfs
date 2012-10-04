@@ -61,6 +61,9 @@ __private_extern__ OSMallocTag ntfs_malloc_tag;
 
 #include "ntfs_volume.h"
 
+typedef struct mount * mount_t;
+typedef struct vnode * vnode_t;
+
 /**
  * NTFS_MP - return the NTFS volume given a vfs mount
  * @mp:		VFS mount
@@ -70,6 +73,11 @@ __private_extern__ OSMallocTag ntfs_malloc_tag;
 static inline ntfs_volume *NTFS_MP(mount_t mp)
 {
 	return (ntfs_volume*)vfs_fsprivate(mp);
+}
+
+void * vfs_fsprivate(mount_t mp)
+{
+         return(mp->mnt_data);
 }
 
 __private_extern__ void ntfs_do_postponed_release(ntfs_volume *vol);
