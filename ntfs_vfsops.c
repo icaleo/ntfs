@@ -5405,16 +5405,10 @@ static struct vnodeopv_desc *ntfs_vnodeopv_desc_list[1] = {
 	&ntfs_vnodeopv_desc,
 };
 
-/* Lock group and lock attribute for allocation and freeing of locks. */
-static lck_grp_attr_t *ntfs_lock_grp_attr;
-lck_grp_t *ntfs_lock_grp;
-lck_attr_t *ntfs_lock_attr;
-
 /* A tag to allow allocation and freeing of memory. */
 MALLOC_DEFINE(M_NTFS, "ntfs", "NTFS structures");
 
 static vfstable_t ntfs_vfstable;
-
 
 static int ntfs_init(struct vfsconf *vcp)
 {
@@ -5436,26 +5430,9 @@ static int ntfs_init(struct vfsconf *vcp)
 	err = ntfs_inode_hash_init();
 	if (err)
 		goto hash_err;
-	vfe = (struct vfs_fsentry) {
-		.vfe_vfsops	= &ntfs_vfsops,
-		.vfe_vopcnt	= 1,	/* For now we just use one set of vnode
-					   operations for all file types.
-					   Note: Current max is 5 due to (not
-					   needed) hard-coded limit in xnu. */
-		.vfe_opvdescs	= ntfs_vnodeopv_desc_list,
-		.vfe_fsname	= "ntfs",
-// TODO: Implement VFS_TBLREADDIR_EXTENDED and set it here.
-		.vfe_flags	= VFS_TBLNATIVEXATTR | VFS_TBL64BITREADY |
-				  VFS_TBLLOCALVOL | VFS_TBLNOTYPENUM |
-				  VFS_TBLFSNODELOCK | VFS_TBLTHREADSAFE,
-	};
-	err = vfs_fsadd(&vfe, &ntfs_vfstable);
-	if (!err) {
-		ntfs_debug("NTFS driver registered successfully.");
-		return 0;
-	}
-	ntfs_error(NULL, "vfs_fsadd() failed (error %d).", (int)err);
-	ntfs_inode_hash_deinit();
+
+	return 0
+		
 hash_err:
 	free(ntfs_file_sds_entry, M_NTFS);
 	ntfs_file_sds_entry = NULL;
@@ -5463,32 +5440,15 @@ sds_err:
 	ntfs_debug_deinit();
 	lockdestroy(&ntfs_lock);
 dbg_err:
-	printf("NTFS: Failed to register the NTFS driver.\n");
-	return KERN_FAILURE;
+	return (err);
 }
 
 
-kern_return_t ntfs_module_stop(kmod_info_t *ki __unused, void *data __unused)
+static int ntfs_uninit(struct vfsconf *vcp)
 {
 	errno_t err;
 
-	if (!ntfs_lock_grp_attr || !ntfs_lock_grp || !ntfs_lock_attr ||
-			!ntfs_malloc_tag)
-		panic("%s(): Lock(s) and/or malloc tag not yet initialized.\n",
-				__FUNCTION__);
 	ntfs_debug("Unregistering NTFS driver.");
-	err = vfs_fsremove(ntfs_vfstable);
-	if (err) {
-		if (err == EBUSY)
-			printf("NTFS: Failed to unregister the NTFS driver "
-					"because there are mounted NTFS "
-					"volumes.\n");
-		else
-			printf("NTFS: Failed to unregister the NTFS driver "
-					"because vfs_fsremove() failed (error "
-					"%d).\n", err);
-		return KERN_FAILURE;
-	}
 	ntfs_inode_hash_deinit();
 	free(ntfs_file_sds_entry, M_NTFS);
 	ntfs_file_sds_entry = NULL;
@@ -5499,14 +5459,6 @@ kern_return_t ntfs_module_stop(kmod_info_t *ki __unused, void *data __unused)
 	 * "Done." before the call.
 	 */
 	ntfs_debug_deinit();
-	lck_mtx_destroy(&ntfs_lock, ntfs_lock_grp);
-	OSMalloc_Tagfree(ntfs_malloc_tag);
-	ntfs_malloc_tag = NULL;
-	lck_attr_free(ntfs_lock_attr);
-	ntfs_lock_attr = NULL;
-	lck_grp_free(ntfs_lock_grp);
-	ntfs_lock_grp = NULL;
-	lck_grp_attr_free(ntfs_lock_grp_attr);
-	ntfs_lock_grp_attr = NULL;
-	return KERN_SUCCESS;
+	lockdestroy(&ntfs_lock);
+	return 0;
 }
