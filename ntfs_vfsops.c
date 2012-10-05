@@ -3238,9 +3238,9 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 /**
  * ntfs_statfs - return information about a mounted ntfs volume
  * @vol:	ntfs volume about which to return information
- * @sfs:	vfsstatfs structure in which to return the information
+ * @sfs:	statfs structure in which to return the information
  *
- * Return information about the mounted ntfs volume @vol in the vfsstatfs
+ * Return information about the mounted ntfs volume @vol in the statfs
  * structure @sfs.  We interpret the values to be correct of the moment in time
  * at which we are called.  Most values are variable otherwise and this is not
  * just the free values but the totals as well.  For example we can increase
@@ -3258,7 +3258,7 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
  *
  * Note: No need for locking as this is only called from ntfs_mount().
  */
-static void ntfs_statfs(ntfs_volume *vol, struct vfsstatfs *sfs)
+static void ntfs_statfs(ntfs_volume *vol, struct statfs *sfs)
 {
 	ntfs_debug("Entering.");
 	/*
@@ -3936,29 +3936,108 @@ err_exit:
 	return err;
 }
 
+static const char *ntfs_opts[] = {
+	"from", "compression", "mode", "caseins", "allnames", NULL
+};
+
+static int
+ntfs_mount(struct mount *mp)
+{
+	int err = 0, error;
+	struct vnode *devvp;
+	struct nameidata ndp;
+	struct thread *td;
+	char *from;
+
+	td = curthread;
+	if (vfs_filteropt(mp->mnt_optnew, ntfs_opts))
+		return (EINVAL);
+
+	/* Force mount as read-only. */
+	MNT_ILOCK(mp);
+	mp->mnt_flag |= MNT_RDONLY;
+	MNT_IUNLOCK(mp);
+
+	from = vfs_getopts(mp->mnt_optnew, "from", &error);
+	if (error)	
+		return (error);
+
+	/*
+	 * If updating, check whether changing from read-only to
+	 * read/write.
+	 */
+	if (mp->mnt_flag & MNT_UPDATE) {
+		if (vfs_flagopt(mp->mnt_optnew, "export", NULL, 0)) {
+			/* Process export requests in vfs_mount.c */
+			return (0);
+		} else {
+			printf("ntfs_mount(): MNT_UPDATE not supported\n");
+			return (EINVAL);
+		}
+	}
+
+	/*
+	 * Not an update, or updating the name: look up the name
+	 * and verify that it refers to a sensible block device.
+	 */
+	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, from, td);
+	err = namei(&ndp);
+	if (err)
+		return (err);
+	NDFREE(&ndp, NDF_ONLY_PNBUF);
+	devvp = ndp.ni_vp;
+
+	if (!vn_isdisk(devvp, &err))  {
+		vput(devvp);
+		return (err);
+	}
+
+	/*
+	 * If mount by non-root, then verify that user has necessary
+	 * permissions on the device.
+	 */
+	err = VOP_ACCESS(devvp, VREAD, td->td_ucred, td);
+	if (err)
+		err = priv_check(td, PRIV_VFS_MOUNT_PERM);
+	if (err) {
+		vput(devvp);
+		return (err);
+	}
+
+
+	/*
+	 * Since this is a new mount, we want the names for the device and
+	 * the mount point copied in.  If an error occurs, the mountpoint is
+	 * discarded by the upper level code.  Note that vfs_mount() handles
+	 * copying the mountpoint f_mntonname for us, so we don't have to do
+	 * it here unless we want to set it to something other than "path"
+	 * for some rason.
+	 */
+
+	err = ntfs_mountfs(devvp, mp, td);
+	if (err == 0) {
+
+		/* Save "mounted from" info for mount point. */
+		vfs_mountedfrom(mp, from);
+	} else
+		vrele(devvp);
+	return (err);
+}
+
 /**
- * ntfs_mount - mount an ntfs file system
+ * ntfs_mountfs - mount an ntfs file system
+ * @devvp:	device vnode
  * @mp:		mount point to initialize/mount
- * @dev_vn:	vnode of the device we are mounting
- * @data:	mount options (in user space)
- * @context:	vfs context
- *
- * The VFS calls this via VFS_MOUNT() when it wants to mount an ntfs volume.
- *
- * Note: @dev_vn is NULLVP if this is a MNT_UPDATE or MNT_RELOAD mount but of
- * course in those cases it can be retrieved from the NTFS_MP(mp)->dev_vn.
- *
- * Return 0 on success and errno on error.
- *
- * We call OSKextRetainKextWithLoadTag() to prevent the KEXT from being
- * unloaded automatically while in use.  If the mount fails, we must call
- * OSKextReleaseKextWithLoadTag() to allow the KEXT to be unloaded.
+ * @td:		user data
+ * Common code for mount and mountroot
  */
-static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
-		vfs_context_t context)
+static int ntfs_mountfs(devvp, mp, td)
+	register struct vnode *devvp;
+	struct mount *mp;
+	struct thread *td;
 {
 	daddr64_t nr_blocks;
-	struct vfsstatfs *sfs = vfs_statfs(mp);
+	struct statfs *sfs = vfs_statfs(mp);
 	ntfs_volume *vol;
 	buf_t buf;
 	kauth_cred_t cred;
@@ -3966,112 +4045,15 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 	NTFS_BOOT_SECTOR *bs;
 	errno_t err, err2;
 	u32 blocksize;
-	ntfs_mount_options_header opts_hdr;
-	ntfs_mount_options_1_0 opts;
-
+	struct cdev *devc = devvp->v_rdev;
+	struct g_consumer *cp;
+    struct g_provider *pp;
+	char *caseins, *comression;
+	
 	ntfs_debug("Entering.");
-	OSKextRetainKextWithLoadTag(OSKextGetCurrentLoadTag());
-	/*
-	 * FIXME: Not convinced that this is necessary.  It may well be
-	 * sufficient to set cred = vfs_context_ucred(context) as some file
-	 * systems do (e.g. msdosfs, old ntfs), but HFS does it this way so we
-	 * follow suit.  Also, some file systems even simply set cred = NOCRED
-	 * (e.g. udf).  Should investigate or ask someone...
-	 */ 
-	cred = vfs_context_proc(context) ? vfs_context_ucred(context) : NOCRED;
-	/* Copy our mount options header from user space. */
-	err = copyin(data, (caddr_t)&opts_hdr, sizeof(opts_hdr));
-	if (err) {
-		ntfs_error(mp, "Failed to copy mount options header from user "
-				"space (error %d).", err);
-		goto unload;
-	}
-	ntfs_debug("Mount options header version %d.%d.", opts_hdr.major_ver,
-			opts_hdr.minor_ver);
-	/* Get and check options. */
-	switch (opts_hdr.major_ver) {
-	case 1:
-		if (opts_hdr.minor_ver != 0)
-			ntfs_warning(mp, "Your version of /sbin/mount_ntfs is "
-					"newer than this driver, ignoring any "
-					"new options.");
-		/* Version 1.x has one option so copy it from user space. */
-		err = copyin((data + sizeof(opts_hdr) + 7) & ~7,
-				(caddr_t)&opts, sizeof(opts));
-		if (err) {
-			ntfs_error(mp, "Failed to copy NTFS mount options "
-					"from user space (error %d).", err);
-			goto unload;
-		}
-		break;
-	case 0:
-		/* Version 0.x has no options at all. */
-		bzero(&opts, sizeof(opts));
-		break;
-	default:
-		ntfs_warning(mp, "Your version of /sbin/mount_ntfs is not "
-				"compatible with this driver, ignoring NTFS "
-				"specific mount options.");
-		bzero(&opts, sizeof(opts));
-		break;
-	}
-	/*
-	 * We only allow read/write mounts if the "nobrowse" option was also
-	 * given.  This is to discourage end users from mounting read/write,
-	 * but still allows our utilities (such as an OS install) to make
-	 * changes to an NTFS volume.  Without the "nobrowse" option, we force
-	 * a read-only mount.  Note that we also check for non-update mounts
-	 * here.  In the case of an update mount, ntfs_remount() will do the
-	 * appropriate checking for changing the writability of the mount.
-	 */
-	if ((vfs_flags(mp) & MNT_DONTBROWSE) == 0 && !vfs_isupdate(mp))
-		vfs_setflags(mp, MNT_RDONLY);
-	/*
-	 * TODO: For now we do not implement ACLs thus we force the "noowners"
-	 * mount option.
-	 */
-	vfs_setflags(mp, MNT_IGNORE_OWNERSHIP);
-	/*
-	 * We do not support MNT_RELOAD yet.  Note, MNT_RELOAD implies the
-	 * file system is currently read-only.
-	 */
-	if (vfs_isreload(mp)) {
-		ntfs_error(mp, "MNT_RELOAD is not supported yet.");
-		err = ENOTSUP;
-		goto unload;
-	}
-	/*
-	 * If this is a remount request, handle this elsewhere.  Note this
-	 * check has to come after the vfs_isreload() check as vfs_isupdate()
-	 * is always true when vfs_isreload() is true but this is not true the
-	 * other way round.
-	 */
-	if (vfs_isupdate(mp))
-		return ntfs_remount(mp, &opts);
-	/* We know this is a real mount request thus @dev_vn is not NULL. */
-	dev = vnode_specrdev(dev_vn);
-	/* Let the VFS do advisory locking for us. */
-	vfs_setlocklocal(mp);
-	/*
-	 * Tell old-style applications that we support VolFS style lookups.
-	 *
-	 * Note we do not set MNT_DOVOLFS because then various things start
-	 * breaking like for example the Finder "Empty Trash" command always
-	 * fails silently unless we also support va_nchildren in
-	 * ntfs_vnop_getattr() and set ATTR_DIR_ENTRYCOUNT in our valid
-	 * directory attributes in ntfs_getattr().
-	 */
-	//vfs_setflags(mp, MNT_DOVOLFS);
-	/*
-	 * Set the file system id in the fsstat part of the mount structure.
-	 * We use the device @dev for the first 32-bit value and the dynamic
-	 * file system number assigned by the VFS to us for the second 32-bit
-	 * value.  This is important because the VFS uses the first 32-bit
-	 * value to satisfy the ATTR_CMN_DEVID request in getattrlist() and
-	 * getvolattrlist() thus it must be the device.
-	 */
-	sfs->f_fsid.val[0] = (int32_t)dev;
-	sfs->f_fsid.val[1] = (int32_t)vfs_typenum(mp);
+	
+	dev = dev2udev(devc);
+	
 	/*
 	 * Allocate and initialize an ntfs volume and attach it to the vfs
 	 * mount.
@@ -4085,7 +4067,7 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 	*vol = (ntfs_volume) {
 		.mp = mp,
 		.dev = dev,
-		.dev_vn = dev_vn,
+		.dev_vn = devvp,
 		/*
 		 * Default is group and other have read-only access to files
 		 * and directories while owner has full access.  Everyone gets
@@ -4104,27 +4086,33 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 		.mft_zone_multiplier = 1,
 		.on_errors = ON_ERRORS_CONTINUE,
 	};
-	lck_rw_init(&vol->mftbmp_lock, ntfs_lock_grp, ntfs_lock_attr);
-	lck_rw_init(&vol->lcnbmp_lock, ntfs_lock_grp, ntfs_lock_attr);
-	lck_mtx_init(&vol->rename_lock, ntfs_lock_grp, ntfs_lock_attr);
-	lck_rw_init(&vol->secure_lock, ntfs_lock_grp, ntfs_lock_attr);
-	lck_spin_init(&vol->security_id_lock, ntfs_lock_grp, ntfs_lock_attr);
-	lck_mtx_init(&vol->inodes_lock, ntfs_lock_grp, ntfs_lock_attr);
-	vfs_setfsprivate(mp, vol);
-	if (vfs_isrdonly(mp))
+
+	if (mp->mnt_flag & MNT_RDONLY)
 		NVolSetReadOnly(vol);
+
 	/* Check for the requested case sensitivity semantics. */
-	if (opts.flags & NTFS_MNT_OPT_CASE_SENSITIVE) {
+	caseins = vfs_getopts(mp->mnt_optnew, "caseins", &error);
+    if (error && error != ENOENT)
+	{
+        goto out;
+	{
+	else 
+	{
 		ntfs_debug("Mounting volume case sensitive.");
 		NVolSetCaseSensitive(vol);
 	}
-// FIXME: For now disable sparse support as it is not done yet...
-#if 0
-	/* By default, enable sparse support. */
-	NVolSetSparseEnabled(vol);
-#endif
-	/* By default, enable compression support. */
-	NVolSetCompressionEnabled(vol);
+
+	/* Check for the requested compression support. */
+	comression = vfs_getopts(mp->mnt_optnew, "comression", &error);
+    if (error && error != ENOENT)
+	{
+        goto out;
+	{
+	else 
+	{
+		NVolSetCompressionEnabled(vol);
+	}
+	
 	blocksize = vfs_devblocksize(mp);
 	/* We support device sector sizes up to the PAGE_SIZE. */
 	if (blocksize > PAGE_SIZE) {
@@ -4163,38 +4151,7 @@ static int ntfs_mount(mount_t mp, vnode_t dev_vn, user_addr_t data,
 		goto err;
 	}
 	vol->nr_blocks = nr_blocks;
-#ifdef DEBUG
-	{
-		u64 dev_size, u;
-		char *suffix;
-		int shift = 0;
-		u8 blocksize_shift = ffs(blocksize) - 1;
-	
-		dev_size = u = (u64)nr_blocks << blocksize_shift;
-		while ((u >>= 10) > 10 && shift < 40)
-			shift += 10;
-		switch (shift) {
-		case 0:
-			suffix = "bytes";
-			break;
-		case 10:
-			suffix = "kiB";
-			break;
-		case 20:
-			suffix = "MiB";
-			break;
-		case 30:
-			suffix = "GiB";
-			break;
-		default:
-			suffix = "TiB";
-			break;
-		}
-		ntfs_debug("Device size is %llu%s (%llu bytes).",
-				(unsigned long long)dev_size >> shift, suffix,
-				(unsigned long long)dev_size);
-	}
-#endif
+
 	/* Read the boot sector and return the buffer containing it. */
 	buf = NULL;
 	bs = NULL;
@@ -4520,7 +4477,7 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 	u64 nr_clusters, nr_free_clusters, nr_used_mft_records;
 	u64 nr_free_mft_records;
 	ntfs_volume *vol = NTFS_MP(mp);
-	struct vfsstatfs *sfs = vfs_statfs(mp);
+	struct statfs *sfs = vfs_statfs(mp);
 	ntfs_inode *ni;
 
 	ntfs_debug("Entering.");

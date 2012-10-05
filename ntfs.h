@@ -41,8 +41,6 @@
 #ifdef KERNEL
 
 
-
-
 /* The email address of the NTFS developers. */
 __private_extern__ const char ntfs_dev_email[];
 __private_extern__ const char ntfs_please_email[];
@@ -61,8 +59,25 @@ __private_extern__ OSMallocTag ntfs_malloc_tag;
 
 #include "ntfs_volume.h"
 
+ /*
+ * typedefs from OS X kernel_types.h
+ */
+typedef int errno_t;
+
 typedef struct mount * mount_t;
+
 typedef struct vnode * vnode_t;
+
+typedef struct buf * buf_t;
+
+typedef struct uio * uio_t;
+
+/* return a pointer to the RO vfs_statfs associated with mount_t */
+struct statfs * 
+vfs_statfs(mount_t mp)
+{
+         return(&mp->mnt_stat);
+}
 
 /**
  * NTFS_MP - return the NTFS volume given a vfs mount
