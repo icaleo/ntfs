@@ -4092,10 +4092,10 @@ static int ntfs_mountfs(devvp, mp, td)
 
 	/* Check for the requested case sensitivity semantics. */
 	caseins = vfs_getopts(mp->mnt_optnew, "caseins", &error);
-    if (error && error != ENOENT)
+	if (error && error != ENOENT)
 	{
-        goto out;
-	{
+        	goto out;
+	}
 	else 
 	{
 		ntfs_debug("Mounting volume case sensitive.");
@@ -4104,10 +4104,10 @@ static int ntfs_mountfs(devvp, mp, td)
 
 	/* Check for the requested compression support. */
 	comression = vfs_getopts(mp->mnt_optnew, "comression", &error);
-    if (error && error != ENOENT)
+    	if (error && error != ENOENT)
 	{
-        goto out;
-	{
+        	goto out;
+	}
 	else 
 	{
 		NVolSetCompressionEnabled(vol);
