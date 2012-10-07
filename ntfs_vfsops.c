@@ -207,7 +207,6 @@ not_ntfs:
 /**
  * ntfs_boot_sector_read - read the ntfs boot sector of a device
  * @vol:	ntfs_volume of device to read the boot sector from
- * @cred:	credentials of running process
  * @buf:	destination pointer for buffer containing boot sector
  * @bs:		destination pointer for boot sector data
  *
@@ -229,8 +228,8 @@ not_ntfs:
  * invalidating them when we release them.  This is needed because the
  * buffer(s) may get read later using a different vnode ($Boot for example).
  */
-static errno_t ntfs_boot_sector_read(ntfs_volume *vol, kauth_cred_t cred,
-		buf_t *buf, NTFS_BOOT_SECTOR **bs)
+static errno_t ntfs_boot_sector_read(ntfs_volume *vol, buf_t *buf,
+						NTFS_BOOT_SECTOR **bs)
 {
 	daddr64_t nr_blocks = vol->nr_blocks;
 	static const char read_err_str[] =
@@ -240,12 +239,14 @@ static errno_t ntfs_boot_sector_read(ntfs_volume *vol, kauth_cred_t cred,
 	buf_t primary, backup;
 	NTFS_BOOT_SECTOR *bs1, *bs2;
 	errno_t err, err2;
-	u32 blocksize = vfs_devblocksize(mp);
+	u_int blocksize;
+
+
 
 	ntfs_debug("Entering.");
 	/* Try to read primary boot sector. */
-	err = buf_meta_bread(dev_vn, 0, blocksize, cred, &primary);
-	buf_setflags(primary, B_NOCACHE);
+	err = bread(dev_vn, 0, NTFS_BOOT_BLOCK_SIZE, NOCRED, &primary);
+	primary->b_flags |= B_NOCACHE;
 	if (!err) {
 		err = buf_map(primary, (caddr_t*)&bs1);
 		if (err) {
@@ -4044,7 +4045,8 @@ static int ntfs_mountfs(devvp, mp, td)
 	dev_t dev;
 	NTFS_BOOT_SECTOR *bs;
 	errno_t err, err2;
-	u32 blocksize;
+	u_int blocksize;
+	off_t mediasize;
 	struct cdev *devc = devvp->v_rdev;
 	struct g_consumer *cp;
     struct g_provider *pp;
@@ -4113,7 +4115,8 @@ static int ntfs_mountfs(devvp, mp, td)
 		NVolSetCompressionEnabled(vol);
 	}
 	
-	blocksize = vfs_devblocksize(mp);
+	err = VOP_IOCTL(devvp, DIOCGSECTORSIZE, &blocksize, 0, NOCRED, td);
+	
 	/* We support device sector sizes up to the PAGE_SIZE. */
 	if (blocksize > PAGE_SIZE) {
 		ntfs_error(mp, "Device has unsupported sector size (%u).  "
@@ -4140,22 +4143,23 @@ static int ntfs_mountfs(devvp, mp, td)
 	} else
 		ntfs_debug("Device block size (%u) is greater than or equal "
 				"to NTFS_BLOCK_SIZE.", blocksize);
-	/* Get the size of the device in units of blocksize bytes. */
-	err = VNOP_IOCTL(dev_vn, DKIOCGETBLOCKCOUNT, (caddr_t)&nr_blocks, 0,
-			context);
+				
+	/* Get the size of the device in bytes. */
+	err = VOP_IOCTL(devvp, DIOCGMEDIASIZE, &mediasize, 0, NOCRED, td);
 	if (err) {
 		ntfs_error(mp, "Failed to determine the size of the device "
-				"(DKIOCGETBLOCKCOUNT ioctl returned error "
+				"(DIOCGMEDIASIZE ioctl returned error "
 				"%d).", err);
 		err = ENXIO;
 		goto err;
 	}
-	vol->nr_blocks = nr_blocks;
+	
+	vol->nr_blocks = (daddr64_t)mediasize/blocksize;
 
 	/* Read the boot sector and return the buffer containing it. */
 	buf = NULL;
 	bs = NULL;
-	err = ntfs_boot_sector_read(vol, cred, &buf, &bs);
+	err = ntfs_boot_sector_read(vol, &buf, &bs);
 	if (err) {
 		ntfs_error(mp, "Not an NTFS volume.");
 		goto err;

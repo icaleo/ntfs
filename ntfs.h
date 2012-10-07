@@ -104,6 +104,7 @@ __private_extern__ void ntfs_do_postponed_release(ntfs_volume *vol);
 
 /* Some useful constants to do with NTFS. */
 enum {
+	NTFS_BOOT_BLOCK_SIZE	= 1024;
 	NTFS_BLOCK_SIZE		= 512,
 	NTFS_BLOCK_SIZE_SHIFT	= 9,
 	NTFS_MAX_NAME_LEN	= 255,
