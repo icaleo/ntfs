@@ -72,6 +72,8 @@ typedef struct buf * buf_t;
 
 typedef struct uio * uio_t;
 
+typedef char * caddr_t;        /* address of a (signed) char */
+
 /* return a pointer to the RO vfs_statfs associated with mount_t */
 struct statfs * 
 vfs_statfs(mount_t mp)

@@ -62,6 +62,9 @@
 #include "ntfs_vnops.h"
 #include "ntfs_volume.h"
 
+/* Convert mount ptr to ntfs_volume ptr. */
+#define VFSTONTFS(mp)     ((struct ntfs_volume *)((mp)->mnt_data))
+
 // FIXME: Change email address but to what?
 const char ntfs_dev_email[] = "linux-ntfs-dev@lists.sourceforge.net";
 const char ntfs_please_email[] = "Please email "
@@ -82,13 +85,13 @@ static ntfschar *ntfs_default_upcase;
 #define ntfs_default_upcase_size (64 * 1024 * sizeof(ntfschar))
 
 static errno_t ntfs_blocksize_set(mount_t mp, vnode_t dev_vn, u32 blocksize,
-		vfs_context_t context)
+		thread *td)
 {
 	errno_t err;
 	struct vfsioattr ia;
 
-	err = VNOP_IOCTL(dev_vn, DKIOCSETBLOCKSIZE, (caddr_t)&blocksize,
-			FWRITE, context);
+	err = VOP_IOCTL(dev_vn, DKIOCSETBLOCKSIZE, (caddr_t)&blocksize,
+			FWRITE, td);
 	if (err)
 		return ENXIO;
 	/*
@@ -239,7 +242,6 @@ static errno_t ntfs_boot_sector_read(ntfs_volume *vol, buf_t *buf,
 	buf_t primary, backup;
 	NTFS_BOOT_SECTOR *bs1, *bs2;
 	errno_t err, err2;
-	u_int blocksize;
 
 
 
@@ -248,21 +250,15 @@ static errno_t ntfs_boot_sector_read(ntfs_volume *vol, buf_t *buf,
 	err = bread(dev_vn, 0, NTFS_BOOT_BLOCK_SIZE, NOCRED, &primary);
 	primary->b_flags |= B_NOCACHE;
 	if (!err) {
-		err = buf_map(primary, (caddr_t*)&bs1);
-		if (err) {
-			ntfs_error(mp, "Failed to map buffer of primary boot "
-					"sector (error %d).", err);
-			bs1 = NULL;
-		} else {
-			if (ntfs_boot_sector_is_valid(mp, bs1)) {
-				*buf = primary;
-				*bs = bs1;
-				ntfs_debug("Done.");
-				return 0;
-			}
-			ntfs_error(mp, "Primary boot sector is invalid.");
-			err = EIO;
+		bs1 = (NTFS_BOOT_SECTOR *)primary->b_data;
+		if (ntfs_boot_sector_is_valid(mp, bs1)) {
+			*buf = primary;
+			*bs = bs1;
+			ntfs_debug("Done.");
+			return 0;
 		}
+		ntfs_error(mp, "Primary boot sector is invalid.");
+		err = EIO;
 	} else {
 		ntfs_error(mp, read_err_str, "primary", err);
 		bs1 = NULL;
@@ -270,66 +266,33 @@ static errno_t ntfs_boot_sector_read(ntfs_volume *vol, buf_t *buf,
 	if (!(vol->on_errors & ON_ERRORS_RECOVER)) {
 		ntfs_error(mp, "Mount option errors=recover not used.  "
 				"Aborting without trying to recover.");
-		if (bs1) {
-			err2 = buf_unmap(primary);
-			if (err2)
-				ntfs_error(mp, "Failed to unmap buffer of "
-						"primary boot sector (error "
-						"%d).", err2);
-		}
-		buf_brelse(primary);
+		brelse(primary);
 		return err;
 	}
 	/* Try to read NT4+ backup boot sector. */
-	err = buf_meta_bread(dev_vn, nr_blocks - 1, blocksize, cred, &backup);
-	buf_setflags(backup, B_NOCACHE);
+	err = bread(dev_vn, nr_blocks - 1, NTFS_BOOT_BLOCK_SIZE, NOCRED, &backup);
+	backup->b_flags |= B_NOCACHE;	
 	if (!err) {
-		err = buf_map(backup, (caddr_t*)&bs2);
-		if (err)
-			ntfs_error(mp, "Failed to map buffer of backup boot "
-					"sector (error %d).", err);
-		else {
-			if (ntfs_boot_sector_is_valid(mp, bs2))
-				goto hotfix_primary_boot_sector;
-			err = buf_unmap(backup);
-			if (err)
-				ntfs_error(mp, "Failed to unmap buffer of "
-						"backup boot sector (error "
-						"%d).", err);
-		}
+		bs2 = (NTFS_BOOT_SECTOR *)backup->b_data;
+		if (ntfs_boot_sector_is_valid(mp, bs2))
+			goto hotfix_primary_boot_sector;
 	} else
 		ntfs_error(mp, read_err_str, "backup", err);
-	buf_brelse(backup);
+	brelse(backup);
 	/* Try to read NT3.51- backup boot sector. */
-	err = buf_meta_bread(dev_vn, nr_blocks >> 1, blocksize, cred, &backup);
-	buf_setflags(backup, B_NOCACHE);
+	err = bread(dev_vn, nr_blocks >> 1, NTFS_BOOT_BLOCK_SIZE, NOCRED, &backup);
+	backup->b_flags |= B_NOCACHE;
 	if (!err) {
-		err = buf_map(backup, (caddr_t*)&bs2);
-		if (err)
-			ntfs_error(mp, "Failed to map buffer of old backup "
-					"boot sector (error %d).", err);
-		else {
-			if (ntfs_boot_sector_is_valid(mp, bs2))
-				goto hotfix_primary_boot_sector;
-			err = buf_unmap(backup);
-			if (err)
-				ntfs_error(mp, "Failed to unmap buffer of old "
-						"backup boot sector (error "
-						"%d).", err);
-			err = EIO;
-		}
+		bs2 = (NTFS_BOOT_SECTOR *)backup->b_data;
+		if (ntfs_boot_sector_is_valid(mp, bs2))
+			goto hotfix_primary_boot_sector;
+		err = EIO;
 		ntfs_error(mp, "Could not find a valid backup boot sector.");
 	} else
 		ntfs_error(mp, read_err_str, "backup", err);
-	buf_brelse(backup);
+	brelse(backup);
 	/* We failed.  Clean up and return. */
-	if (bs1) {
-		err2 = buf_unmap(primary);
-		if (err2)
-			ntfs_error(mp, "Failed to unmap buffer of primary "
-					"boot sector (error %d).", err2);
-	}
-	buf_brelse(primary);
+	brelse(primary);
 	return err;
 hotfix_primary_boot_sector:
 	ntfs_warning(mp, "Using backup boot sector.");
@@ -343,8 +306,8 @@ hotfix_primary_boot_sector:
 	if (bs1 && !NVolReadOnly(vol)) {
 		ntfs_warning(mp, "Hot-fix: Recovering invalid primary boot "
 				"sector from backup copy.");
-		memcpy(bs1, bs2, blocksize);
-		err = buf_bwrite(primary);
+		bcopy(bs2, bs1, NTFS_BOOT_BLOCK_SIZE);
+		err = bwrite(primary);
 		if (err)
 			ntfs_error(mp, "Hot-fix: Device write error while "
 					"recovering primary boot sector "
@@ -353,16 +316,11 @@ hotfix_primary_boot_sector:
 		if (bs1) {
 			ntfs_warning(mp, "Hot-fix: Recovery of primary boot "
 					"sector failed: Read-only mount.");
-			err = buf_unmap(primary);
-			if (err)
-				ntfs_error(mp, "Failed to unmap buffer of "
-						"primary boot sector (error "
-						"%d).", err);
 		} else
 			ntfs_warning(mp, "Hot-fix: Recovery of primary boot "
 					"sector failed as it could not be "
 					"mapped.");
-		buf_brelse(primary);
+		brelse(primary);
 	}
 	*buf = backup;
 	*bs = bs2;
@@ -3238,7 +3196,7 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 
 /**
  * ntfs_statfs - return information about a mounted ntfs volume
- * @vol:	ntfs volume about which to return information
+ * @mp:		mount point about which to return information
  * @sfs:	statfs structure in which to return the information
  *
  * Return information about the mounted ntfs volume @vol in the statfs
@@ -3259,9 +3217,12 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
  *
  * Note: No need for locking as this is only called from ntfs_mount().
  */
-static void ntfs_statfs(ntfs_volume *vol, struct statfs *sfs)
+static void ntfs_statfs(mount *mp, struct statfs *sfs)
 {
+	ntfs_volume *vol;
+
 	ntfs_debug("Entering.");
+	vol = VFSTONTFS(mp);
 	/*
 	 * Block size for the below size values.  We use the cluster size of
 	 * the volume as that means we do not convert to a different unit.
@@ -3286,8 +3247,6 @@ static void ntfs_statfs(ntfs_volume *vol, struct statfs *sfs)
 	 * @sfs->f_bavail to 0.
 	 */ 
 	sfs->f_bavail = (u64)vol->nr_free_clusters;
-	/* Blocks in use (in units of @f_bsize). */
-	sfs->f_bused = (u64)(vol->nr_clusters - vol->nr_free_clusters);
 	/* Number of inodes in file system (at this point in time). */
 	sfs->f_files = (u64)vol->nr_mft_records;
 	/* Free inodes in file system (at this point in time). */
@@ -3944,7 +3903,7 @@ static const char *ntfs_opts[] = {
 static int
 ntfs_mount(struct mount *mp)
 {
-	int err = 0, error;
+	errno_t err = 0;
 	struct vnode *devvp;
 	struct nameidata ndp;
 	struct thread *td;
@@ -3959,9 +3918,9 @@ ntfs_mount(struct mount *mp)
 	mp->mnt_flag |= MNT_RDONLY;
 	MNT_IUNLOCK(mp);
 
-	from = vfs_getopts(mp->mnt_optnew, "from", &error);
-	if (error)	
-		return (error);
+	from = vfs_getopts(mp->mnt_optnew, "from", &err);
+	if (err)	
+		return (err);
 
 	/*
 	 * If updating, check whether changing from read-only to
@@ -4038,7 +3997,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	struct thread *td;
 {
 	daddr64_t nr_blocks;
-	struct statfs *sfs = vfs_statfs(mp);
+	struct statfs *sfs;
 	ntfs_volume *vol;
 	buf_t buf;
 	kauth_cred_t cred;
@@ -4127,19 +4086,10 @@ static int ntfs_mountfs(devvp, mp, td)
 	}
 	/*
 	 * If the block size of the device we are to mount is less than
-	 * NTFS_BLOCK_SIZE, change the block size to NTFS_BLOCK_SIZE.
+	 * NTFS_BLOCK_SIZE, issue warning.
 	 */
 	if (blocksize < NTFS_BLOCK_SIZE) {
-		ntfs_debug("Setting device block size to NTFS_BLOCK_SIZE.");
-		err = ntfs_blocksize_set(mp, dev_vn, NTFS_BLOCK_SIZE, context);
-		if (err) {
-			ntfs_error(mp, "Failed to set device block size to "
-					"NTFS_BLOCK_SIZE (512 bytes) because "
-					"the DKIOCSETBLOCKSIZE ioctl returned "
-					"error %d).", err);
-			goto err;
-		}
-		blocksize = NTFS_BLOCK_SIZE;
+		ntfs_warning("Device block size (%u) is less than NTFS_BLOCK_SIZE.", blocksize);
 	} else
 		ntfs_debug("Device block size (%u) is greater than or equal "
 				"to NTFS_BLOCK_SIZE.", blocksize);
@@ -4169,11 +4119,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	 * using it.
 	 */
 	err = ntfs_boot_sector_parse(vol, bs);
-	err2 = buf_unmap(buf);
-	if (err2)
-		ntfs_error(mp, "Failed to unmap buffer of boot sector (error "
-				"%d).", err2);
-	buf_brelse(buf);
+	brelse(buf);
 	if (err) {
 		ntfs_error(mp, "%s NTFS file system.",
 				err == ENOTSUP ? "Unsupported" : "Invalid");
@@ -4196,7 +4142,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	 */
 	if (vol->sector_size > blocksize) {
 		ntfs_debug("Setting device block size to sector size.");
-		err = ntfs_blocksize_set(mp, dev_vn, vol->sector_size, context);
+		err = ntfs_blocksize_set(mp, dev_vn, vol->sector_size, td);
 		if (err) {
 			ntfs_error(mp, "Failed to set device block size to "
 					"sector size (%u bytes) because "
@@ -4215,7 +4161,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	err = ntfs_mft_inode_get(vol);
 	if (err)
 		goto err;
-	lck_mtx_lock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (NVolCompressionEnabled(vol)) {
 		/*
 		 * The current mount may be a compression user if the cluster
@@ -4235,7 +4181,7 @@ static int ntfs_mountfs(devvp, mp, td)
 							"buffer for "
 							"compression engine.");
 					NVolClearCompressionEnabled(vol);
-					lck_mtx_unlock(&ntfs_lock);
+					lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 					goto err;
 				}
 			}
@@ -4258,7 +4204,7 @@ static int ntfs_mountfs(devvp, mp, td)
 			// is that low on memory?
 			ntfs_error(mp, "Failed to allocate memory for default "
 					"upcase table.");
-			lck_mtx_unlock(&ntfs_lock);
+			lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 			err = ENOMEM;
 			goto err;
 		}
@@ -4270,7 +4216,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	 * race conditions with concurrent (u)mounts.
 	 */
 	ntfs_default_upcase_users++;
-	lck_mtx_unlock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 	/* Process the system inodes. */
 	err = ntfs_system_inodes_get(vol);
 	/*
@@ -4280,12 +4226,12 @@ static int ntfs_mountfs(devvp, mp, td)
 	 * out.  In any case, we can drop our temporary reference on the
 	 * default upcase table and throw it away if we had the only reference.
 	 */
-	lck_mtx_lock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (!--ntfs_default_upcase_users) {
 		free(ntfs_default_upcase, M_NTFS);
 		ntfs_default_upcase = NULL;
 	}
-	lck_mtx_unlock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 	/* If we failed to process the system inodes, abort the mount. */
 	if (err) {
 		ntfs_error(mp, "Failed to load system files (error %d).", err);
@@ -4310,12 +4256,12 @@ static int ntfs_mountfs(devvp, mp, td)
 	 * Finally, determine the statfs information for the volume and cache
 	 * it in the vfs mount structure.
 	 */
-	ntfs_statfs(vol, sfs);
+	ntfs_statfs(mp, &mp->mnt_stat);
 	ntfs_debug("Done.");
 	return 0;
 unload:
 	/* Ensure NTFS_MP(mp) is NULL so it is safe to call ntfs_unmount(). */
-	vfs_setfsprivate(mp, NULL);
+	mp->mnt_data = NULL;
 err:
 	ntfs_error(mp, "Mount failed (error %d).", err);
 	/*
@@ -5352,16 +5298,6 @@ static int ntfs_setattr(struct mount *mp, struct vfs_attr *fsa,
 	return 0;
 }
 
-static struct vfsops ntfs_vfsops = {
-	.vfs_mount	= ntfs_mount,
-	.vfs_unmount	= ntfs_unmount,
-	.vfs_root	= ntfs_root,
-	.vfs_getattr	= ntfs_getattr,
-	.vfs_sync	= ntfs_sync,
-	.vfs_vget	= ntfs_vget,
-	.vfs_setattr	= ntfs_setattr,
-};
-
 static struct vnodeopv_desc *ntfs_vnodeopv_desc_list[1] = {
 	&ntfs_vnodeopv_desc,
 };
@@ -5404,7 +5340,6 @@ dbg_err:
 	return (err);
 }
 
-
 static int ntfs_uninit(struct vfsconf *vcp)
 {
 	errno_t err;
@@ -5423,3 +5358,17 @@ static int ntfs_uninit(struct vfsconf *vcp)
 	lockdestroy(&ntfs_lock);
 	return 0;
 }
+
+static struct vfsops ntfs_vfsops = {
+	.vfs_mount	= ntfs_mount,
+	.vfs_unmount	= ntfs_unmount,
+	.vfs_root	= ntfs_root,
+	.vfs_sync	= ntfs_sync,
+	.vfs_vget	= ntfs_vget,
+	.vfs_init	= ntfs_init,
+	.vfs_statfs	= ntfs_statfs,
+	.vfs_uninit	= ntfs_uninit,
+};
+
+VFS_SET(ntfs_vfsops, ntfs, VFCF_READONLY);
+MODULE_VERSION(ntfs, 1);
