@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_DIR_H
-#define _OSX_NTFS_DIR_H
+#ifndef _BSD_NTFS_DIR_H
+#define _BSD_NTFS_DIR_H
 
 
 #include "ntfs.h"
@@ -105,4 +105,4 @@ typedef struct _ntfs_dirhint ntfs_dirhint;
 
 __private_extern__ void ntfs_dirhints_put(ntfs_inode *ni, BOOL stale_only);
 
-#endif /* !_OSX_NTFS_DIR_H */
+#endif /* !_BSD_NTFS_DIR_H */

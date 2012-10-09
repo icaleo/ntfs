@@ -36,8 +36,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_LOGFILE_H
-#define _OSX_NTFS_LOGFILE_H
+#ifndef _BSD_NTFS_LOGFILE_H
+#define _BSD_NTFS_LOGFILE_H
 
 
 #include "ntfs_endian.h"
@@ -319,4 +319,4 @@ __private_extern__ BOOL ntfs_logfile_is_clean(ntfs_inode *ni,
 
 __private_extern__ errno_t ntfs_logfile_empty(ntfs_inode *ni);
 
-#endif /* !_OSX_NTFS_LOGFILE_H */
+#endif /* !_BSD_NTFS_LOGFILE_H */

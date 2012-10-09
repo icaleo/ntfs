@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_H
-#define _OSX_NTFS_H
+#ifndef _BSD_NTFS_H
+#define _BSD_NTFS_H
 
 #ifdef KERNEL
 
@@ -190,4 +190,4 @@ typedef struct {
 	// TODO: Add NTFS specific mount options here.
 } __attribute__((__packed__)) ntfs_mount_options_1_0;
 
-#endif /* !_OSX_NTFS_H */
+#endif /* !_BSD_NTFS_H */

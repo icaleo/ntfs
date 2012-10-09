@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_DEBUG_H
-#define _OSX_NTFS_DEBUG_H
+#ifndef _BSD_NTFS_DEBUG_H
+#define _BSD_NTFS_DEBUG_H
 
 
 #include "ntfs_runlist.h"
@@ -85,4 +85,4 @@ __private_extern__ void ntfs_debug_attr_list_dump(const u8 *al,
 
 #endif /* !DEBUG */
 
-#endif /* !_OSX_NTFS_DEBUG_H */
+#endif /* !_BSD_NTFS_DEBUG_H */

@@ -36,8 +36,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_UNISTR_H
-#define _OSX_NTFS_UNISTR_H
+#ifndef _BSD_NTFS_UNISTR_H
+#define _BSD_NTFS_UNISTR_H
 
 #include "ntfs_layout.h"
 #include "ntfs_types.h"
@@ -89,4 +89,4 @@ __private_extern__ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 
 __private_extern__ void ntfs_upcase_table_generate(ntfschar *uc, int uc_size);
 
-#endif /* !_OSX_NTFS_UNISTR_H */
+#endif /* !_BSD_NTFS_UNISTR_H */

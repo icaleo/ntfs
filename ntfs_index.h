@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_INDEX_H
-#define _OSX_NTFS_INDEX_H
+#ifndef _BSD_NTFS_INDEX_H
+#define _BSD_NTFS_INDEX_H
 
 
 
@@ -415,4 +415,4 @@ static inline errno_t ntfs_index_entry_add(ntfs_index_context *ictx,
 			data, data_len);
 }
 
-#endif /* _OSX_NTFS_INDEX_H */
+#endif /* _BSD_NTFS_INDEX_H */

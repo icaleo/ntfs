@@ -4000,7 +4000,6 @@ static int ntfs_mountfs(devvp, mp, td)
 	struct statfs *sfs;
 	ntfs_volume *vol;
 	buf_t buf;
-	kauth_cred_t cred;
 	dev_t dev;
 	NTFS_BOOT_SECTOR *bs;
 	errno_t err, err2;

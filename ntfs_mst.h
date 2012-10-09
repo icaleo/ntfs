@@ -36,8 +36,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_MST_H
-#define _OSX_NTFS_MST_H
+#ifndef _BSD_NTFS_MST_H
+#define _BSD_NTFS_MST_H
 
 
 #include "ntfs_layout.h"
@@ -50,4 +50,4 @@ __private_extern__ errno_t ntfs_mst_fixup_pre_write(NTFS_RECORD *b,
 		const u32 size);
 __private_extern__ void ntfs_mst_fixup_post_write(NTFS_RECORD *b);
 
-#endif /* !_OSX_NTFS_MST_H */
+#endif /* !_BSD_NTFS_MST_H */

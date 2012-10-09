@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_VOLUME_H
-#define _OSX_NTFS_VOLUME_H
+#ifndef _BSD_NTFS_VOLUME_H
+#define _BSD_NTFS_VOLUME_H
 
 
 
@@ -253,4 +253,4 @@ DEFINE_NVOL_BIT_OPS(ReadOnly)
 DEFINE_NVOL_BIT_OPS(UseSDAttr)
 DEFINE_NVOL_BIT_OPS(PostponedRelease)
 
-#endif /* !_OSX_NTFS_VOLUME_H */
+#endif /* !_BSD_NTFS_VOLUME_H */

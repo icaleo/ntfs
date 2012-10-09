@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_MFT_H
-#define _OSX_NTFS_MFT_H
+#ifndef _BSD_NTFS_MFT_H
+#define _BSD_NTFS_MFT_H
 
 
 #include "ntfs_inode.h"
@@ -114,4 +114,4 @@ __private_extern__ errno_t ntfs_mft_record_alloc(ntfs_volume *vol,
 __private_extern__ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni,
 		ntfs_inode *ni, MFT_RECORD *m);
 
-#endif /* !_OSX_NTFS_MFT_H */
+#endif /* !_BSD_NTFS_MFT_H */

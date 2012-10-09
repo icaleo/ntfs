@@ -35,8 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#ifndef _OSX_NTFS_VNOPS_H
-#define _OSX_NTFS_VNOPS_H
+#ifndef _BSD_NTFS_VNOPS_H
+#define _BSD_NTFS_VNOPS_H
 
 
 typedef int vnop_t(void *);
@@ -47,4 +47,4 @@ __private_extern__ struct vnodeopv_desc ntfs_vnodeopv_desc;
 
 __private_extern__ int ntfs_cluster_iodone(buf_t cbp, void *arg __unused);
 
-#endif /* !_OSX_NTFS_VNOPS_H */
+#endif /* !_BSD_NTFS_VNOPS_H */
