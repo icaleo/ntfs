@@ -2545,6 +2545,7 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 	vnode_t root_vn;
 	errno_t err;
 	BOOL is_hibernated;
+	namecache *v_cache;
 
 	ntfs_debug("Entering.");
 	/*
@@ -2563,9 +2564,13 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 	 * vnode as the parent vnode.  We also take an internal reference on
 	 * the root inode because vnode_update_identity() takes a reference on
 	 * the root vnode.
+	 * FIXME: Not sure that it makes sense since entry can be purged from namecache in FreeBSD ...
 	 */
-	vnode_update_identity(vol->mft_ni->vn, root_vn, NULL, 0, 0,
-			VNODE_UPDATE_PARENT);
+	v_cache = vol->mft_ni->vn->v_cache_dd;
+	if (v_cache != NULL)
+		v_cache->nc_dvp = root_vn;
+	else
+		ntfs_error(vol->mp, "Failed to update namecache.");
 	atomic_add_32(&root_ni->nr_refs, 1);
 	/*
 	 * Get mft mirror inode and compare the contents of $MFT and $MFTMirr,
@@ -3521,15 +3526,13 @@ static int ntfs_unmount(mount_t mp, int mnt_flags)
 		/* Drop the internal reference on the parent inode. */
 		if (vol->root_ni)
 			atomic_subtract_32(&vol->root_ni->nr_refs, 1);
-		vnode_update_identity(vol->mftmirr_ni->vn, NULL, NULL, 0, 0,
-				VNODE_UPDATE_PARENT);
+		cache_purge(vol->mftmirr_ni->vn);
 	}
 	if (vol->mft_ni && vol->mft_ni->vn) {
 		/* Drop the internal reference on the parent inode. */
 		if (vol->root_ni)
 			atomic_subtract_32(&vol->root_ni->nr_refs, 1);
-		vnode_update_identity(vol->mft_ni->vn, NULL, NULL, 0, 0,
-				VNODE_UPDATE_PARENT);
+		cache_purge(vol->mft_ni->vn);
 	}
 	/*
 	 * Nothing references the root inode any more so we can release it.
