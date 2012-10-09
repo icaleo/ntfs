@@ -1035,7 +1035,7 @@ info_err:
 			err = vnode_ref(ni->vn);
 			if (err)
 				ntfs_error(vol->mp, "vnode_ref() failed!");
-			OSIncrementAtomic(&ni->nr_refs);
+			atomic_add_32(&ni->nr_refs, 1);
 			vol->mft_ni = ni;
 			/* The $MFT inode is fully setup now, so unlock it. */
 			ntfs_inode_unlock_alloc(ni);
@@ -1139,12 +1139,12 @@ static errno_t ntfs_inode_attach(ntfs_volume *vol, const ino64_t mft_no,
 	 * reference taken on the parent vnode in vnode_create().
 	 */
 	if (parent_vn)
-		OSIncrementAtomic(&NTFS_I(parent_vn)->nr_refs);
+		atomic_add_32(&NTFS_I(parent_vn)->nr_refs, 1);
 	vn = (*ni)->vn;
 	err = vnode_ref(vn);
 	if (err)
 		ntfs_error(vol->mp, "vnode_ref() failed!");
-	OSIncrementAtomic(&(*ni)->nr_refs);
+	atomic_add_32(&(*ni)->nr_refs, 1);
 	lck_rw_unlock_shared(&(*ni)->lock);
 	(void)vnode_put(vn);
 	ntfs_debug("Done.");
@@ -1195,12 +1195,12 @@ static errno_t ntfs_attr_inode_attach(ntfs_inode *base_ni,
 	 * the parent inode) to balance the reference taken on the parent vnode
 	 * in vnode_create().
 	 */
-	OSIncrementAtomic(&base_ni->nr_refs);
+	atomic_add_32(&base_ni->nr_refs, 1);
 	vn = (*ni)->vn;
 	err = vnode_ref(vn);
 	if (err)
 		ntfs_error(base_ni->vol->mp, "vnode_ref() failed!");
-	OSIncrementAtomic(&(*ni)->nr_refs);
+	atomic_add_32(&(*ni)->nr_refs, 1);
 	lck_rw_unlock_shared(&(*ni)->lock);
 	(void)vnode_put(vn);
 	ntfs_debug("Done.");
@@ -1247,12 +1247,12 @@ static errno_t ntfs_index_inode_attach(ntfs_inode *base_ni, ntfschar *name,
 	 * the parent inode) to balance the reference taken on the parent vnode
 	 * in vnode_create().
 	 */
-	OSIncrementAtomic(&base_ni->nr_refs);
+	atomic_add_32(&base_ni->nr_refs, 1);
 	vn = (*ni)->vn;
 	err = vnode_ref(vn);
 	if (err)
 		ntfs_error(base_ni->vol->mp, "vnode_ref() failed!");
-	OSIncrementAtomic(&(*ni)->nr_refs);
+	atomic_add_32(&(*ni)->nr_refs, 1);
 	(void)vnode_put(vn);
 	ntfs_debug("Done.");
 	return 0;
@@ -1314,11 +1314,11 @@ static errno_t ntfs_mft_mirror_load(ntfs_volume *vol)
 		(void)vnode_put(vn);
 		return EIO;
 	}
-	OSIncrementAtomic(&vol->root_ni->nr_refs);
+	atomic_add_32(&vol->root_ni->nr_refs, 1);
 	err = vnode_ref(vn);
 	if (err)
 		ntfs_error(vol->mp, "vnode_ref() failed!");
-	OSIncrementAtomic(&ni->nr_refs);
+	atomic_add_32(&ni->nr_refs, 1);
 	lck_rw_unlock_shared(&ni->lock);
 	(void)vnode_put(vn);
 	vol->mftmirr_ni = ni;
@@ -2566,7 +2566,7 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 	 */
 	vnode_update_identity(vol->mft_ni->vn, root_vn, NULL, 0, 0,
 			VNODE_UPDATE_PARENT);
-	OSIncrementAtomic(&root_ni->nr_refs);
+	atomic_add_32(&root_ni->nr_refs, 1);
 	/*
 	 * Get mft mirror inode and compare the contents of $MFT and $MFTMirr,
 	 * then deal with any errors.
@@ -3302,8 +3302,8 @@ static void ntfs_unmount_inode_detach(ntfs_inode **pni, ntfs_inode *parent_ni)
 				(unsigned long long)ni->mft_no);
 		/* Drop the internal reference on the parent inode. */
 		if (parent_ni)
-			OSDecrementAtomic(&parent_ni->nr_refs);
-		OSDecrementAtomic(&ni->nr_refs);
+			atomic_subtract_32(&parent_ni->nr_refs, 1);
+		atomic_subtract_32(&ni->nr_refs, 1);
 		if (ni->vn) {
 			(void)vnode_recycle(ni->vn);
 			vnode_rele(ni->vn);
@@ -3333,8 +3333,8 @@ static void ntfs_unmount_attr_inode_detach(ntfs_inode **pni)
 		 * (which is also the parent inode).
 		 */
 		if (NInoAttr(ni) && ni->base_ni)
-			OSDecrementAtomic(&ni->base_ni->nr_refs);
-		OSDecrementAtomic(&ni->nr_refs);
+			atomic_subtract_32(&ni->base_ni->nr_refs, 1);
+		atomic_subtract_32(&ni->nr_refs, 1);
 		if (ni->vn) {
 			(void)vnode_recycle(ni->vn);
 			vnode_rele(ni->vn);
@@ -3406,7 +3406,6 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
  * ntfs_unmount - unmount an ntfs file system
  * @mp:		mount point to unmount
  * @mnt_flags:	flags describing the unmount (MNT_FORCE is the only one)
- * @context:	vfs context
  *
  * The VFS calls this via VFS_UNMOUNT() when it wants to unmount an ntfs
  * volume.  We sync and release all held inodes as well as all other resources.
@@ -3421,20 +3420,22 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
  *
  * Return 0 on success and errno on error.
  */
-static int ntfs_unmount(mount_t mp, int mnt_flags,
-		vfs_context_t context __unused)
+static int ntfs_unmount(mount_t mp, int mnt_flags)
 {
 	ntfs_volume *vol;
+	struct vnode *vp1, *vp2;
 	int vflags, err;
 	BOOL force;
+	struct thread *td;
 
 	ntfs_debug("Entering.");
+	td = curthread;
 	vol = NTFS_MP(mp);
 	if (!vol)
 		goto unload;
 	if (!vol->mft_ni) {
 		/* Split our ntfs_volume away from the mount. */
-		vfs_setfsprivate(mp, NULL);
+		mp->mnt_data = NULL;
 		goto no_mft;
 	}
 	vflags = 0;
@@ -3449,7 +3450,7 @@ static int ntfs_unmount(mount_t mp, int mnt_flags,
 	 * Try to reclaim all non-root and non-system vnodes.  For a non-forced
 	 * unmount, this will fail if there are any open files.
 	 */
-	err = vflush(mp, NULLVP, vflags|SKIPROOT|SKIPSYSTEM);
+	err = vflush(mp, NULLVP, vflags|SKIPROOT|SKIPSYSTEM, td);
 	if (err) {
 		ntfs_warning(mp, "Cannot unmount (vflush() returned error "
 				"%d).  Are there open files keeping the "
@@ -3465,7 +3466,12 @@ static int ntfs_unmount(mount_t mp, int mnt_flags,
 	 * recycle all remaining vnodes so that they will all be reclaimed as
 	 * soon as their last references are dropped.
 	 */
-	(void)vnode_iterate(mp, 0, ntfs_unmount_callback_recycle, NULL);
+	vp1 = TAILQ_FIRST(&mp->mnt_nvnodelist);
+	while(vp1 != NULL) {
+		vp2 = TAILQ_NEXT(vp1, v_nmntvnodes);
+		ntfs_unmount_callback_recycle(vp1, NULL);
+		vp1 = vp2;
+	}
 	/*
 	 * If a read-write mount and no volume errors have been detected, mark
 	 * the volume clean.
@@ -3514,14 +3520,14 @@ static int ntfs_unmount(mount_t mp, int mnt_flags,
 	if (vol->mftmirr_ni && vol->mftmirr_ni->vn) {
 		/* Drop the internal reference on the parent inode. */
 		if (vol->root_ni)
-			OSDecrementAtomic(&vol->root_ni->nr_refs);
+			atomic_subtract_32(&vol->root_ni->nr_refs, 1);
 		vnode_update_identity(vol->mftmirr_ni->vn, NULL, NULL, 0, 0,
 				VNODE_UPDATE_PARENT);
 	}
 	if (vol->mft_ni && vol->mft_ni->vn) {
 		/* Drop the internal reference on the parent inode. */
 		if (vol->root_ni)
-			OSDecrementAtomic(&vol->root_ni->nr_refs);
+			atomic_subtract_32(&vol->root_ni->nr_refs, 1);
 		vnode_update_identity(vol->mft_ni->vn, NULL, NULL, 0, 0,
 				VNODE_UPDATE_PARENT);
 	}
@@ -4295,7 +4301,7 @@ err:
 	 * Note we need to pass MNT_FORCE to ensure ntfs_unmount() definitely
 	 * ends up calling OSKextReleaseKextWithLoadTag().
 	 */
-	ntfs_unmount(mp, MNT_FORCE, context);
+	ntfs_unmount(mp, MNT_FORCE);
 	return err;
 }
 

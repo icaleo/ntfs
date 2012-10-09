@@ -63,11 +63,11 @@ struct _ntfs_inode {
 	ntfs_volume *vol;	/* Pointer to the ntfs volume of this inode. */
 	vnode_t vn;		/* Vnode attached to the ntfs inode or NULL if
 				   this is an extent ntfs inode. */
-	SInt32 nr_refs;		/* This is the number of usecount references on
+	u32 nr_refs;		/* This is the number of usecount references on
 				   the vnode of this inode that are held by
 				   ntfs driver internal entities.  For extent
 				   mft records, this is always zero. */
-	SInt32 nr_opens;	/* This is the number of VNOP_OPEN() calls that
+	u32 nr_opens;		/* This is the number of VNOP_OPEN() calls that
 				   have happened on the vnode of this inode
 				   that have not had a matching VNOP_CLOSE()
 				   call yet.  Note this applies only to base

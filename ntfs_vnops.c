@@ -1647,7 +1647,7 @@ static int ntfs_vnop_open(struct vnop_open_args *a)
 	 * we count other vnodes towards the base vnode open count to ensure
 	 * we do the right thing in ntfs_unlink().
 	 */
-	OSIncrementAtomic(&base_ni->nr_opens);
+	atomic_add_32(&base_ni->nr_opens, 1);
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
 }
@@ -1684,7 +1684,7 @@ static int ntfs_vnop_close(struct vnop_close_args *a)
 	 * we count other vnodes towards the base vnode open count to ensure
 	 * we do the right thing in ntfs_unlink().
 	 */
-	OSDecrementAtomic(&base_ni->nr_opens);
+	atomic_subtract_32(&base_ni->nr_opens, 1);
 	/*
 	 * If the vnode is still in use release any expired directory hints.
 	 *
