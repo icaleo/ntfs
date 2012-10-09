@@ -4007,10 +4007,32 @@ static int ntfs_mountfs(devvp, mp, td)
 	off_t mediasize;
 	struct cdev *devc = devvp->v_rdev;
 	struct g_consumer *cp;
-    struct g_provider *pp;
+	struct g_provider *pp;
 	char *caseins, *comression;
 	
 	ntfs_debug("Entering.");
+	
+	DROP_GIANT();
+	g_topology_lock();
+	
+	/*
+	* XXX: Do not allow more than one consumer to open a device
+	*      associated with a particular GEOM provider.
+	*      This disables multiple read-only mounts of a device,
+	*      but it gets rid of panics in vget() when you try to
+	*      mount the same device more than once.
+	*/
+	pp = g_dev_getprovider(devvp->v_rdev);
+	if ((pp != NULL) && ((pp->acr | pp->acw | pp->ace ) != 0))
+		err = EPERM;
+	else
+		err = g_vfs_open(devvp, &cp, "ntfs", 0);
+
+	g_topology_unlock();
+	PICKUP_GIANT();
+	VOP_UNLOCK(devvp, 0);
+	if (err)
+		return (err);
 	
 	dev = dev2udev(devc);
 	
@@ -4256,6 +4278,9 @@ static int ntfs_mountfs(devvp, mp, td)
 	 * it in the vfs mount structure.
 	 */
 	ntfs_statfs(mp, &mp->mnt_stat);
+	MNT_ILOCK(mp);
+	mp->mnt_flag |= MNT_LOCAL;
+	MNT_IUNLOCK(mp);
 	ntfs_debug("Done.");
 	return 0;
 unload:
