@@ -2564,11 +2564,13 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 	 * vnode as the parent vnode.  We also take an internal reference on
 	 * the root inode because vnode_update_identity() takes a reference on
 	 * the root vnode.
-	 * FIXME: Not sure that it makes sense since entry can be purged from namecache in FreeBSD ...
+	 * FIXME: Not sure that it makes sense since entry can be purged from namecache in FreeBSD at any time.
 	 */
 	v_cache = vol->mft_ni->vn->v_cache_dd;
 	if (v_cache != NULL)
+		CACHE_WLOCK()
 		v_cache->nc_dvp = root_vn;
+		CACHE_WUNLOCK()
 	else
 		ntfs_error(vol->mp, "Failed to update namecache.");
 	atomic_add_32(&root_ni->nr_refs, 1);
