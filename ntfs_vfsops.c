@@ -1575,7 +1575,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 	vol->upcase_len = data_size >> NTFSCHAR_SIZE_SHIFT;
 	ntfs_debug("Read %lld bytes from $UpCase (expected %lu bytes).",
 			(long long)data_size, 64LU * 1024 * sizeof(ntfschar));
-	lck_mtx_lock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (!ntfs_default_upcase) {
 		ntfs_debug("Using volume specified $UpCase since default is "
 				"not present.");
@@ -1600,7 +1600,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 			ntfs_debug("Using volume specified $UpCase since it "
 					"does not match the default.");
 	}
-	lck_mtx_unlock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 	ntfs_debug("Done.");
 	return 0;
 err:
@@ -1614,7 +1614,7 @@ err:
 		(void)vnode_recycle(ni->vn);
 		(void)vnode_put(ni->vn);
 	}
-	lck_mtx_lock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (ntfs_default_upcase) {
 		vol->upcase = ntfs_default_upcase;
 		vol->upcase_len = ntfs_default_upcase_size >>
@@ -1626,7 +1626,7 @@ err:
 		err = 0;
 	} else
 		ntfs_error(vol->mp, "Failed to initialize upcase table.");
-	lck_mtx_unlock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 	return err;
 }
 
@@ -3365,7 +3365,7 @@ static void ntfs_unmount_attr_inode_detach(ntfs_inode **pni)
 void ntfs_do_postponed_release(ntfs_volume *vol)
 {
 	ntfs_debug("Doing postponed release of volume.");
-	lck_mtx_lock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (vol->upcase && vol->upcase == ntfs_default_upcase) {
 		vol->upcase = NULL;
 		/*
@@ -3387,7 +3387,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 			ntfs_compression_buffer = NULL;
 		}
 	}
-	lck_mtx_unlock(&ntfs_lock);
+	lockmgr(&ntfs_lock, LK_RELEASE, NULL);
 	/* If we loaded the attribute definitions table, throw it away now. */
 	if (vol->attrdef)
 		free(vol->attrdef, M_NTFS);
@@ -3549,7 +3549,7 @@ static int ntfs_unmount(mount_t mp, int mnt_flags)
 	 * flag otherwise it blows away the mft mirror and mft inodes which we
 	 * will recycle below.
 	 */
-	(void)vflush(mp, NULLVP, vflags & ~FORCECLOSE);
+	(void)vflush(mp, NULLVP, vflags & ~FORCECLOSE, td);
 	ntfs_unmount_inode_detach(&vol->mftmirr_ni, NULL);
 no_root:
 	if (vol->mft_ni) {
@@ -3575,11 +3575,11 @@ no_root:
 	 * we want to?  It does not seem to be worth the hassle given it should
 	 * never really happen...
 	 */
-	err = vflush(mp, NULLVP, vflags);
+	err = vflush(mp, NULLVP, vflags, td);
 	if (err && !force) {
 		ntfs_error(mp, "There are busy vnodes after unmounting!  "
 				"Forcibly closing and reclaiming them.");
-		(void)vflush(mp, NULLVP, FORCECLOSE);
+		(void)vflush(mp, NULLVP, FORCECLOSE, td);
 
 	}
 	/* Split our ntfs_volume away from the mount. */
