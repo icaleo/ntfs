@@ -3402,7 +3402,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	sx_destroy(&vol->mftbmp_lock);
 	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
-	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
+	sx_destroy(&vol->secure_lock);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
 	/* Finally, free the ntfs volume. */
@@ -3603,7 +3603,7 @@ no_mft:
 	sx_destroy(&vol->mftbmp_lock);
 	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
-	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
+	sx_destroy(&vol->secure_lock);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
 	/* Finally, free the ntfs volume. */
@@ -4083,6 +4083,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	mtx_init(&vol->rename_lock, "rename lock", NULL, MTX_DEF);
 	sx_init(&vol->mftbmp_lock, "mftbmp lock");
 	sx_init(&vol->lcnbmp_lock, "lcnbmp lock");
+	sx_init(&vol->secure_lock, "secure lock");
 
 	if (mp->mnt_flag & MNT_RDONLY)
 		NVolSetReadOnly(vol);

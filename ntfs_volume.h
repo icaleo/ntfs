@@ -160,7 +160,7 @@ struct _ntfs_volume {
 	ntfs_inode *secure_sds_ni;	/* Attribute inode of $Secure/$SDS. */
 	ntfs_inode *secure_sdh_ni;	/* Index inode of $Secure/$SDH. */
 	ntfs_inode *secure_sii_ni;	/* Index inode of $Secure/$SII. */
-	lck_rw_t secure_lock;		/* Lock for serializing accesses to the
+	struct sx secure_lock;		/* Lock for serializing accesses to the
 					   $Secure related inodes. */
 	le32 next_security_id;		/* The security_id to use the next time
 					   a new security descriptor is added

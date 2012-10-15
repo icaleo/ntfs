@@ -495,7 +495,7 @@ errno_t ntfs_default_security_id_init(ntfs_volume *vol, struct vnode_attr *va)
 	le32 security_id;
 
 	ntfs_debug("Entering.");
-	lck_rw_lock_exclusive(&vol->secure_lock);
+	sx_xlock(&vol->secure_lock);
 	lck_spin_lock(&vol->security_id_lock);
 	if (va->va_type == VDIR)
 		security_id = vol->default_dir_security_id;
@@ -504,14 +504,14 @@ errno_t ntfs_default_security_id_init(ntfs_volume *vol, struct vnode_attr *va)
 	lck_spin_unlock(&vol->security_id_lock);
 	if (security_id) {
 		/* Someone else initialized the default security_id for us. */
-		lck_rw_unlock_exclusive(&vol->secure_lock);
+		sx_xunlock(&vol->secure_lock);
 		ntfs_debug("Done (lost race).");
 		return 0;
 	}
 	// TODO: Look for our security descriptor appropriate to the volume
 	// version.  If the security descriptor is not found, add it to $Secure
 	// and set the volume default security_id to point to it.
-	lck_rw_unlock_exclusive(&vol->secure_lock);
+	sx_xunlock(&vol->secure_lock);
 	ntfs_debug("Failed (not implemented yet).");
 	return ENOTSUP;
 }
