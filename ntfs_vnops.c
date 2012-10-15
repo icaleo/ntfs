@@ -5758,11 +5758,11 @@ static int ntfs_vnop_rename(struct vnop_rename_args *a)
 	else {
 		BOOL is_parent;
 
-		lck_mtx_lock(&vol->rename_lock);
+		mtx_lock(&vol->rename_lock);
 		err = ntfs_inode_is_parent(src_dir_ni, dst_dir_ni, &is_parent,
 				src_ni);
 		if (err) {
-			lck_mtx_unlock(&vol->rename_lock);
+			mtx_unlock(&vol->rename_lock);
 			/*
 			 * @err == EINVAL means @src_ni matches or is a parent
 			 * of @dst_dir_ni.  This would create a directory
@@ -6417,7 +6417,7 @@ err:
 	lck_rw_unlock_exclusive(&src_dir_ni->lock);
 	if (src_dir_ni != dst_dir_ni) {
 		lck_rw_unlock_exclusive(&dst_dir_ni->lock);
-		lck_mtx_unlock(&vol->rename_lock);
+		mtx_unlock(&vol->rename_lock);
 	}
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
@@ -7581,7 +7581,7 @@ do_next:
 	 * inode cache thus there are no problems from that point of view
 	 * either.
 	 */
-	lck_rw_lock_exclusive(&vol->mftbmp_lock);
+	sx_xlock(&vol->mftbmp_lock);
 	mftbmp_ni = vol->mftbmp_ni;
 	err = vnode_get(mftbmp_ni->vn);
 	if (err)
@@ -7620,7 +7620,7 @@ do_next:
 		lck_rw_unlock_shared(&mftbmp_ni->lock);
 		(void)vnode_put(mftbmp_ni->vn);
 	}
-	lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+	sx_xunlock(&vol->mftbmp_lock);
 	ntfs_debug("Done (deleted base inode).");
 	return 0;
 }

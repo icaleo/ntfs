@@ -36,9 +36,10 @@
  */
 
 
-
-
-
+#include <sys/types.h>
+#include <sys/lock.h>
+#include <sys/lockmgr.h>
+#include <sys/mutex.h>
 
 
 #include "ntfs.h"
@@ -3176,7 +3177,7 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 	 * First, determine the total number of mft records from the size of
 	 * the $MFT/$DATA attribute.
 	 */
-	lck_rw_lock_exclusive(&vol->mftbmp_lock);
+	sx_xlock(&vol->mftbmp_lock);
 	lck_spin_lock(&vol->mft_ni->size_lock);
 	vol->nr_mft_records = vol->mft_ni->data_size >>
 			vol->mft_record_size_shift;
@@ -3186,7 +3187,7 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 			vol->mft_record_size_shift, &nr_free);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$BITMAP.");
-		lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+		sx_xunlock(&vol->mftbmp_lock);
 		return err;
 	}
 	/* Determine the number of zero bits from the number of set bits. */
@@ -3197,7 +3198,7 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 	vol->nr_free_mft_records = nr_free;
 	ntfs_debug("Done (nr_mft_records %lld, nr_free_mft_records %lld).",
 			(long long)vol->nr_mft_records, (long long)nr_free);
-	lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+	sx_xunlock(&vol->mftbmp_lock);
 	return 0;
 }
 
@@ -3398,9 +3399,9 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	if (vol->name)
 		free(vol->name, M_NTFS);
 	/* Deinitialize the ntfs_volume locks. */
-	lck_rw_destroy(&vol->mftbmp_lock, ntfs_lock_grp);
+	sx_destroy(&vol->mftbmp_lock);
 	lck_rw_destroy(&vol->lcnbmp_lock, ntfs_lock_grp);
-	lck_mtx_destroy(&vol->rename_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->rename_lock);
 	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
@@ -3599,9 +3600,9 @@ no_root:
 	return 0;
 no_mft:
 	/* Deinitialize the ntfs_volume locks. */
-	lck_rw_destroy(&vol->mftbmp_lock, ntfs_lock_grp);
+	sx_destroy(&vol->mftbmp_lock);
 	lck_rw_destroy(&vol->lcnbmp_lock, ntfs_lock_grp);
-	lck_mtx_destroy(&vol->rename_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->rename_lock);
 	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
 	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
@@ -4079,6 +4080,8 @@ static int ntfs_mountfs(devvp, mp, td)
 		.mft_zone_multiplier = 1,
 		.on_errors = ON_ERRORS_CONTINUE,
 	};
+	mtx_init(&vol->rename_lock, "rename lock", NULL, MTX_DEF);
+	sx_init(&vol->mftbmp_lock, "mftbmp lock");
 
 	if (mp->mnt_flag & MNT_RDONLY)
 		NVolSetReadOnly(vol);
@@ -4467,14 +4470,14 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 
 	ntfs_debug("Entering.");
 	/* Get a fully consistent snapshot of this point in time. */
-	lck_rw_lock_shared(&vol->mftbmp_lock);
+	sx_slock(&vol->mftbmp_lock);
 	lck_rw_lock_shared(&vol->lcnbmp_lock);
 	nr_clusters = vol->nr_clusters;
 	nr_free_clusters = vol->nr_free_clusters;
 	lck_rw_unlock_shared(&vol->lcnbmp_lock);
 	nr_free_mft_records = vol->nr_free_mft_records;
 	nr_used_mft_records = vol->nr_mft_records - nr_free_mft_records;
-	lck_rw_unlock_shared(&vol->mftbmp_lock);
+	sx_sunlock(&vol->mftbmp_lock);
 	/* Number of file system objects on volume (at this point in time). */
 	VFSATTR_RETURN(fsa, f_objcount, nr_used_mft_records);
 	/*

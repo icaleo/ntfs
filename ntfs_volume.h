@@ -117,7 +117,7 @@ struct _ntfs_volume {
 
 	ntfs_inode *mftbmp_ni;		/* Attribute ntfs inode for
 					   $MFT/$BITMAP. */
-	lck_rw_t mftbmp_lock;		/* Lock for serializing accesses to the
+	struct sx mftbmp_lock;		/* Lock for serializing accesses to the
 					   mft record bitmap ($MFT/$BITMAP) as
 					   well as to @nr_mft_records and
 					   @nr_free_mft_records. */
@@ -150,7 +150,7 @@ struct _ntfs_volume {
 	u8 major_ver;			/* Ntfs major version of volume. */
 	u8 minor_ver;			/* Ntfs minor version of volume. */
 
-	lck_mtx_t rename_lock;		/* Lock serializing directory tree
+	struct mtx rename_lock;		/* Lock serializing directory tree
 					   reshaping rename operations. */
 
 	ntfs_inode *root_ni;		/* The ntfs inode of the root

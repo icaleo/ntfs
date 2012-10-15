@@ -2059,7 +2059,7 @@ errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
 		panic("%s(): !new_ni || !new_m || !new_a\n", __FUNCTION__);
 	if (!base_ni)
 		panic("%s(): !base_ni\n", __FUNCTION__);
-	lck_rw_lock_exclusive(&vol->mftbmp_lock);
+	sx_xlock(&vol->mftbmp_lock);
 	/*
 	 * Get an iocount reference on the mft and mftbmp vnodes.
 	 *
@@ -2073,7 +2073,7 @@ errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
 		err = vnode_get(mft_ni->vn);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
-			lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+			sx_xunlock(&vol->mftbmp_lock);
 			return err;
 		}
 	}
@@ -2083,7 +2083,7 @@ errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$Bitmap.");
 		if (va)
 			(void)vnode_put(mft_ni->vn);
-		lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+		sx_xunlock(&vol->mftbmp_lock);
 		return err;
 	}
 retry_mftbmp_alloc:
@@ -2417,7 +2417,7 @@ mft_rec_already_initialized:
 	 * that it is allocated in the mft bitmap means that no-one will try to
 	 * allocate it either.
 	 */
-	lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+	sx_xunlock(&vol->mftbmp_lock);
 	/*
 	 * We now have allocated and initialized the mft record.
 	 *
@@ -2475,7 +2475,7 @@ mft_rec_already_initialized:
 						(unsigned long long)bit, err);
 			buf_brelse(buf);
 			lck_rw_unlock_shared(&mft_ni->lock);
-			lck_rw_lock_exclusive(&vol->mftbmp_lock);
+			sx_xlock(&vol->mftbmp_lock);
 			NVolSetErrors(vol);
 			goto retry_mftbmp_alloc;
 		}
@@ -2972,7 +2972,7 @@ undo_mftbmp_alloc:
 	} else
 		buf_brelse(buf);
 	lck_rw_unlock_shared(&mft_ni->lock);
-	lck_rw_lock_exclusive(&vol->mftbmp_lock);
+	sx_xlock(&vol->mftbmp_lock);
 	/*
 	 * We decremented the cached number of free mft records thus we need to
 	 * increment it again here now that we are not allocating the mft
@@ -3002,7 +3002,7 @@ undo_mftbmp_alloc_locked:
 	}
 	lck_rw_unlock_shared(&mftbmp_ni->lock);
 err:
-	lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+	sx_xunlock(&vol->mftbmp_lock);
 	(void)vnode_put(mftbmp_ni->vn);
 	if (va)
 		(void)vnode_put(mft_ni->vn);
@@ -3122,7 +3122,7 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 	 * Clear the bit in the $MFT/$BITMAP corresponding to this record thus
 	 * making it available for someone else to allocate it.
 	 */
-	lck_rw_lock_exclusive(&vol->mftbmp_lock);
+	sx_xlock(&vol->mftbmp_lock);
 	err = vnode_get(vol->mftbmp_ni->vn);
 	if (err)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$BITMAP.");
@@ -3144,7 +3144,7 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 						__FUNCTION__);
 		}
 	}
-	lck_rw_unlock_exclusive(&vol->mftbmp_lock);
+	sx_xunlock(&vol->mftbmp_lock);
 	if (err) {
 		/*
 		 * The extent inode is gone but we failed to deallocate it in
