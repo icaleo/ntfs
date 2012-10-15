@@ -194,7 +194,7 @@ struct _ntfs_volume {
 	ntfs_inode *usnjrnl_j_ni;	/* Attribute inode for $UsnJrnl/$J. */
 
 	ntfs_inode_list_head inodes;	/* List of all loaded ntfs_inodes. */
-	lck_mtx_t inodes_lock;		/* Lock protecting access to inodes
+	struct mtx inodes_lock;		/* Lock protecting access to inodes
 					   list. */
 };
 

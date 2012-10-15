@@ -313,9 +313,9 @@ retry:
 	LIST_INSERT_HEAD(list, nni, hash);
 	lck_mtx_unlock(&ntfs_inode_hash_lock);
 	/* Add the inode to the list of inodes in the volume. */
-	lck_mtx_lock(&vol->inodes_lock);
+	mtx_lock(&vol->inodes_lock);
 	LIST_INSERT_HEAD(&vol->inodes, nni, inodes);
-	lck_mtx_unlock(&vol->inodes_lock);
+	mtx_unlock(&vol->inodes_lock);
 	ntfs_debug("Done (new ntfs_inode added to cache).");
 	return nni;
 }

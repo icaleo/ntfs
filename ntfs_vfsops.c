@@ -3404,7 +3404,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	mtx_destroy(&vol->rename_lock);
 	sx_destroy(&vol->secure_lock);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
-	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->inodes_lock);
 	/* Finally, free the ntfs volume. */
 	free(vol, M_NTFS);
 	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
@@ -3587,14 +3587,14 @@ no_root:
 	vol->mp = NULL;
 	vfs_setfsprivate(mp, NULL);
 	/* If there are still inodes attached, postpone freeing the volume. */
-	lck_mtx_lock(&vol->inodes_lock);
+	mtx_lock(&vol->inodes_lock);
 	if (!LIST_EMPTY(&vol->inodes)) {
 		NVolSetPostponedRelease(vol);
-		lck_mtx_unlock(&vol->inodes_lock);
+		mtx_unlock(&vol->inodes_lock);
 		ntfs_debug("Scheduled postponed release of volume.");
 		return 0;
 	}
-	lck_mtx_unlock(&vol->inodes_lock);
+	mtx_unlock(&vol->inodes_lock);
 	ntfs_do_postponed_release(vol);
 	ntfs_debug("Done.");
 	return 0;
@@ -3605,7 +3605,7 @@ no_mft:
 	mtx_destroy(&vol->rename_lock);
 	sx_destroy(&vol->secure_lock);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
-	lck_mtx_destroy(&vol->inodes_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->inodes_lock);
 	/* Finally, free the ntfs volume. */
 	free(vol, M_NTFS);
 unload:
@@ -4081,6 +4081,7 @@ static int ntfs_mountfs(devvp, mp, td)
 		.on_errors = ON_ERRORS_CONTINUE,
 	};
 	mtx_init(&vol->rename_lock, "rename lock", NULL, MTX_DEF);
+	mtx_init(&vol->inodes_lock, "inodes lock", NULL, MTX_DEF);
 	sx_init(&vol->mftbmp_lock, "mftbmp lock");
 	sx_init(&vol->lcnbmp_lock, "lcnbmp lock");
 	sx_init(&vol->secure_lock, "secure lock");

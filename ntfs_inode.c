@@ -3169,7 +3169,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 			ni->name != NTFS_SFM_AFPINFO_NAME)
 		free(ni->name, M_NTFS);
 	/* Remove the inode from the list of inodes in the volume. */
-	lck_mtx_lock(&vol->inodes_lock);
+	mtx_lock(&vol->inodes_lock);
 	LIST_REMOVE(ni, inodes);
 	/*
 	 * If this was the last inode and the release of the volume was
@@ -3180,7 +3180,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 		NVolClearPostponedRelease(vol);
 		do_release = TRUE;
 	}
-	lck_mtx_unlock(&vol->inodes_lock);
+	mtx_unlock(&vol->inodes_lock);
 	/* Destroy all the locks before finally discarding the ntfs inode. */
 	lck_rw_destroy(&ni->lock, ntfs_lock_grp);
 	lck_spin_destroy(&ni->size_lock, ntfs_lock_grp);
