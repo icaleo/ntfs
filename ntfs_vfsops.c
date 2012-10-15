@@ -3125,12 +3125,12 @@ static errno_t ntfs_set_nr_free_clusters(ntfs_volume *vol)
 	errno_t err;
 
 	ntfs_debug("Entering.");
-	lck_rw_lock_exclusive(&vol->lcnbmp_lock);
+	sx_xlock(&vol->lcnbmp_lock);
 	err = ntfs_get_nr_set_bits(vol->lcnbmp_ni->vn, vol->nr_clusters,
 			&nr_free);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
 	/* Determine the number of zero bits from the number of set bits. */
@@ -3147,7 +3147,7 @@ static errno_t ntfs_set_nr_free_clusters(ntfs_volume *vol)
 	vol->nr_free_clusters = nr_free;
 	ntfs_debug("Done (nr_clusters %lld, nr_free_clusters %lld).",
 			(long long)vol->nr_clusters, (long long)nr_free);
-	lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+	sx_xunlock(&vol->lcnbmp_lock);
 	return 0;
 }
 
@@ -3400,7 +3400,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 		free(vol->name, M_NTFS);
 	/* Deinitialize the ntfs_volume locks. */
 	sx_destroy(&vol->mftbmp_lock);
-	lck_rw_destroy(&vol->lcnbmp_lock, ntfs_lock_grp);
+	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
 	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
@@ -3601,7 +3601,7 @@ no_root:
 no_mft:
 	/* Deinitialize the ntfs_volume locks. */
 	sx_destroy(&vol->mftbmp_lock);
-	lck_rw_destroy(&vol->lcnbmp_lock, ntfs_lock_grp);
+	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
 	lck_rw_destroy(&vol->secure_lock, ntfs_lock_grp);
 	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
@@ -4082,6 +4082,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	};
 	mtx_init(&vol->rename_lock, "rename lock", NULL, MTX_DEF);
 	sx_init(&vol->mftbmp_lock, "mftbmp lock");
+	sx_init(&vol->lcnbmp_lock, "lcnbmp lock");
 
 	if (mp->mnt_flag & MNT_RDONLY)
 		NVolSetReadOnly(vol);
@@ -4471,10 +4472,10 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 	ntfs_debug("Entering.");
 	/* Get a fully consistent snapshot of this point in time. */
 	sx_slock(&vol->mftbmp_lock);
-	lck_rw_lock_shared(&vol->lcnbmp_lock);
+	sx_slock(&vol->lcnbmp_lock);
 	nr_clusters = vol->nr_clusters;
 	nr_free_clusters = vol->nr_free_clusters;
-	lck_rw_unlock_shared(&vol->lcnbmp_lock);
+	sx_sunlock(&vol->lcnbmp_lock);
 	nr_free_mft_records = vol->nr_free_mft_records;
 	nr_used_mft_records = vol->nr_mft_records - nr_free_mft_records;
 	sx_sunlock(&vol->mftbmp_lock);

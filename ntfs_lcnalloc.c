@@ -178,11 +178,11 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 		return 0;
 	}
 	/* Take the lcnbmp lock for writing. */
-	lck_rw_lock_exclusive(&vol->lcnbmp_lock);
+	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_ni->vn);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
 	lck_rw_lock_shared(&lcnbmp_ni->lock);
@@ -813,7 +813,7 @@ out:
 		}
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		if (runlist->alloc)
 			free(runlist->rl, M_NTFS);
 		runlist->rl = rl;
@@ -850,7 +850,7 @@ out:
 				"0x%llx.", (long long)vol->data1_zone_pos);
 	lck_rw_unlock_shared(&lcnbmp_ni->lock);
 	(void)vnode_put(lcnbmp_ni->vn);
-	lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+	sx_xunlock(&vol->lcnbmp_lock);
 	return err;
 }
 
@@ -1031,7 +1031,7 @@ errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol, ntfs_rl_element *rl,
 
 	lcnbmp_ni = vol->lcnbmp_ni;
 	lcnbmp_vn = lcnbmp_ni->vn;
-	lck_rw_lock_exclusive(&vol->lcnbmp_lock);
+	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_vn);
 	if (!err) {
 		lck_rw_lock_shared(&lcnbmp_ni->lock);
@@ -1039,10 +1039,10 @@ errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol, ntfs_rl_element *rl,
 				count, nr_freed);
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
-	lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+	sx_xunlock(&vol->lcnbmp_lock);
 	ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
 	return err;
 }
@@ -1369,7 +1369,7 @@ errno_t ntfs_cluster_free(ntfs_inode *ni, const VCN start_vcn, s64 count,
 	vol = ni->vol;
 	lcnbmp_ni = vol->lcnbmp_ni;
 	lcnbmp_vn = lcnbmp_ni->vn;
-	lck_rw_lock_exclusive(&vol->lcnbmp_lock);
+	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_vn);
 	if (!err) {
 		lck_rw_lock_shared(&lcnbmp_ni->lock);
@@ -1377,10 +1377,10 @@ errno_t ntfs_cluster_free(ntfs_inode *ni, const VCN start_vcn, s64 count,
 				nr_freed, FALSE);
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
-	lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+	sx_xunlock(&vol->lcnbmp_lock);
 	ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
 	return err;
 }

@@ -831,11 +831,11 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	lcn = rl->lcn + rl->length;
 	ntfs_debug("Last lcn of mft bitmap attribute is 0x%llx.",
 			(unsigned long long)lcn);
-	lck_rw_lock_exclusive(&vol->lcnbmp_lock);
+	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_ni->vn);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
 		return err;
 	}
@@ -851,7 +851,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	if (err) {
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
 		ntfs_error(vol->mp, "Failed to read from lcn bitmap.");
 		return err;
@@ -867,7 +867,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, TRUE);
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		/* Update the mft bitmap runlist. */
 		rl->length++;
 		rl[1].vcn++;
@@ -878,7 +878,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, FALSE);
 		lck_rw_unlock_shared(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
-		lck_rw_unlock_exclusive(&vol->lcnbmp_lock);
+		sx_xunlock(&vol->lcnbmp_lock);
 		/* Allocate a cluster from the DATA_ZONE. */
 		runlist.rl = NULL;
 		runlist.alloc = runlist.elements = 0;

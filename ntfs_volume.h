@@ -136,7 +136,7 @@ struct _ntfs_volume {
 	ntfs_inode *logfile_ni;		/* The ntfs inode of $LogFile. */
 
 	ntfs_inode *lcnbmp_ni;		/* The ntfs inode of $Bitmap. */
-	lck_rw_t lcnbmp_lock;		/* Lock for serializing accesses to the
+	struct sx lcnbmp_lock;		/* Lock for serializing accesses to the
 					   cluster bitmap ($Bitmap/$DATA) as
 					   well as to @nr_clusters and
 					   @nr_free_clusters. */
