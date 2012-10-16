@@ -3403,7 +3403,7 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
 	sx_destroy(&vol->secure_lock);
-	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->security_id_lock);
 	mtx_destroy(&vol->inodes_lock);
 	/* Finally, free the ntfs volume. */
 	free(vol, M_NTFS);
@@ -3604,7 +3604,7 @@ no_mft:
 	sx_destroy(&vol->lcnbmp_lock);
 	mtx_destroy(&vol->rename_lock);
 	sx_destroy(&vol->secure_lock);
-	lck_spin_destroy(&vol->security_id_lock, ntfs_lock_grp);
+	mtx_destroy(&vol->security_id_lock);
 	mtx_destroy(&vol->inodes_lock);
 	/* Finally, free the ntfs volume. */
 	free(vol, M_NTFS);
@@ -4085,6 +4085,10 @@ static int ntfs_mountfs(devvp, mp, td)
 	sx_init(&vol->mftbmp_lock, "mftbmp lock");
 	sx_init(&vol->lcnbmp_lock, "lcnbmp lock");
 	sx_init(&vol->secure_lock, "secure lock");
+	/*
+ 	*FIXME: Do we realy need spinlock here ?
+ 	*/
+	mtx_init(&vol->security_id_lock, "security id lock", NULL, MTX_SPIN);
 
 	if (mp->mnt_flag & MNT_RDONLY)
 		NVolSetReadOnly(vol);

@@ -170,7 +170,7 @@ struct _ntfs_volume {
 					   initialized. */
 	le32 default_file_security_id;	/* The security_id to use when creating
 					   files or 0 if not initialized. */
-	lck_spin_t security_id_lock;	/* Lock for serializing accesses to the
+	struct mtx security_id_lock;	/* Lock for serializing accesses to the
 					   security_id related variables. */
 	/*
 	 * $Extend system directory is located in the root directory with inode

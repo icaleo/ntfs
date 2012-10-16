@@ -2625,12 +2625,12 @@ mft_rec_already_initialized:
 		else {
 			BOOL is_retry = FALSE;
 retry:
-			lck_spin_lock(&vol->security_id_lock);
+			mtx_lock_spin(&vol->security_id_lock);
 			if (va->va_type == VDIR)
 				security_id = vol->default_dir_security_id;
 			else
 				security_id = vol->default_file_security_id;
-			lck_spin_unlock(&vol->security_id_lock);
+			mtx_unlock_spin(&vol->security_id_lock);
 			/*
 			 * If the default security_id is not initialized, try
 			 * to initialize it now and should the initialization
