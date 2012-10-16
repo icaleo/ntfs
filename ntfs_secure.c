@@ -223,7 +223,7 @@ errno_t ntfs_next_security_id_init(ntfs_volume *vol, le32 *next_security_id)
 				"$Secure/$INDEX_ALLOCATION/$SII.");
 		return err;
 	}
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Get hold of the mft record for $Secure. */
 	err = ntfs_mft_record_map(base_ni, &m);
 	if (err) {
@@ -304,7 +304,7 @@ errno_t ntfs_next_security_id_init(ntfs_volume *vol, le32 *next_security_id)
 			*next_security_id = const_cpu_to_le32(0x100);
 		ntfs_attr_search_ctx_put(actx);
 		ntfs_mft_record_unmap(base_ni);
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);
 		ntfs_debug("Found next security_id 0x%x in index root.",
 				(unsigned)le32_to_cpu(*next_security_id));
@@ -447,7 +447,7 @@ fast_descend_into_child_node:
 		else
 			*next_security_id = const_cpu_to_le32(0x100);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);
 		ntfs_debug("Found next security_id 0x%x in index allocation.",
 				le32_to_cpu(*next_security_id));
@@ -482,7 +482,7 @@ err:
 		ntfs_attr_search_ctx_put(actx);
 	if (m)
 		ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(ni->vn);
 	return err;
 idx_err:

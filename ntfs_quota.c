@@ -76,7 +76,7 @@ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol)
 				"$Quota/$Q.");
 		return err;
 	}
-	lck_rw_lock_exclusive(&vol->quota_q_ni->lock);
+	sx_xlock(&vol->quota_q_ni->lock);
 	ictx = ntfs_index_ctx_get(vol->quota_q_ni);
 	if (!ictx) {
 		ntfs_error(vol->mp, "Failed to get index context.");
@@ -135,7 +135,7 @@ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol)
 	NInoSetDirtyTimes(quota_ni);
 set_done:
 	ntfs_index_ctx_put(ictx);
-	lck_rw_unlock_exclusive(&vol->quota_q_ni->lock);
+	sx_xunlock(&vol->quota_q_ni->lock);
 	(void)vnode_put(vol->quota_q_ni->vn);
 	/*
 	 * We set the flag so we do not try to mark the quotas out of date
@@ -148,7 +148,7 @@ done:
 err:
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
-	lck_rw_unlock_exclusive(&vol->quota_q_ni->lock);
+	sx_xunlock(&vol->quota_q_ni->lock);
 	(void)vnode_put(vol->quota_q_ni->vn);
 	return err;
 }

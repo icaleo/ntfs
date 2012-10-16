@@ -106,7 +106,7 @@ static inline int ntfs_get_cb_type(ntfs_inode *ni, s64 ofs)
 	vcn = start_vcn = ofs >> ni->vol->cluster_size_shift;
 	end_vcn = start_vcn + ni->compression_block_clusters;
 	write_locked = is_retry = FALSE;
-	lck_rw_lock_shared(&ni->rl.lock);
+	sx_slock(&ni->rl.lock);
 retry_remap:
 	rl = ni->rl.rl;
 	if (ni->rl.elements) {
@@ -151,8 +151,8 @@ next_vcn:
 	/* The runlist is not mapped or an error occured. */
 	if (!write_locked) {
 		write_locked = TRUE;
-		if (!lck_rw_lock_shared_to_exclusive(&ni->rl.lock)) {
-			lck_rw_lock_exclusive(&ni->rl.lock);
+		if (!sx_try_upgrade(&ni->rl.lock)) {
+			sx_xlock(&ni->rl.lock);
 			goto retry_remap;
 		}
 	}
@@ -166,9 +166,9 @@ next_vcn:
 		ret = EIO;
 done:
 	if (write_locked)
-		lck_rw_unlock_exclusive(&ni->rl.lock);
+		sx_xunlock(&ni->rl.lock);
 	else
-		lck_rw_unlock_shared(&ni->rl.lock);
+		sx_sunlock(&ni->rl.lock);
 	if (ret < 0)
 		ntfs_debug("Done (compression block is %s).",
 				cb_type_str[-ret - 1]);

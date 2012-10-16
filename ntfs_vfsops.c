@@ -1146,7 +1146,7 @@ static errno_t ntfs_inode_attach(ntfs_volume *vol, const ino64_t mft_no,
 	if (err)
 		ntfs_error(vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&(*ni)->nr_refs, 1);
-	lck_rw_unlock_shared(&(*ni)->lock);
+	sx_sunlock(&(*ni)->lock);
 	(void)vnode_put(vn);
 	ntfs_debug("Done.");
 	return 0;
@@ -1202,7 +1202,7 @@ static errno_t ntfs_attr_inode_attach(ntfs_inode *base_ni,
 	if (err)
 		ntfs_error(base_ni->vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&(*ni)->nr_refs, 1);
-	lck_rw_unlock_shared(&(*ni)->lock);
+	sx_sunlock(&(*ni)->lock);
 	(void)vnode_put(vn);
 	ntfs_debug("Done.");
 	return 0;
@@ -1320,7 +1320,7 @@ static errno_t ntfs_mft_mirror_load(ntfs_volume *vol)
 	if (err)
 		ntfs_error(vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&ni->nr_refs, 1);
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(vn);
 	vol->mftmirr_ni = ni;
 	ntfs_debug("Done.");
@@ -1368,7 +1368,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFTMirr.");
 		goto err;
 	}
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	for (i = 0; i < nr_mirr_recs; i++) {
 		/* Get the next $MFTMirr record. */
 		err = buf_meta_bread(ni->vn, i, rec_size, NOCRED, &buf);
@@ -1414,7 +1414,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 	 * Because we have just read at least the beginning of the mft mirror,
 	 * we know we have mapped at least the beginning of the runlist for it.
 	 */
-	lck_rw_lock_shared(&ni->rl.lock);
+	sx_slock(&ni->rl.lock);
 	/*
 	 * The runlist for the mft mirror must contain at least @nr_mirr_recs
 	 * mft records and they must be in the first run, i.e. consecutive on
@@ -1429,8 +1429,8 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		err = EIO;
 	} else
 		ntfs_debug("Done.");
-	lck_rw_unlock_shared(&ni->rl.lock);
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->rl.lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(ni->vn);
 	/*
 	 * Now read the $MFT records one at a time and compare each against the
@@ -1442,7 +1442,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 		goto err;
 	}
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	mirr = (MFT_RECORD*)mirr_start;
 	for (i = 0; i < nr_mirr_recs; i++) {
 		unsigned bytes;
@@ -1498,7 +1498,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		buf_brelse(buf);
 	}
 unlock:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(ni->vn);
 err:
 	free(mirr_start, M_NTFS);
@@ -1570,7 +1570,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 		memcpy((u8*)vol->upcase + ofs, kaddr, u);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
 	(void)vnode_put(ni->vn);
 	vol->upcase_len = data_size >> NTFSCHAR_SIZE_SHIFT;
@@ -1611,7 +1611,7 @@ err:
 		vol->upcase_len = 0;
 	}
 	if (ni) {
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_recycle(ni->vn);
 		(void)vnode_put(ni->vn);
 	}
@@ -1687,7 +1687,7 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 		memcpy((u8*)vol->attrdef + ofs, kaddr, u);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
 	(void)vnode_put(ni->vn);
 	vol->attrdef_size = data_size;
@@ -1700,7 +1700,7 @@ err:
 		vol->attrdef = NULL;
 	}
 	if (ni) {
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_recycle(ni->vn);
 		(void)vnode_put(ni->vn);
 	}
@@ -1912,10 +1912,10 @@ static errno_t ntfs_windows_hibernation_status_check(ntfs_volume *vol,
 	 * Find the inode number for the hibernation file by looking up the
 	 * filename hiberfil.sys in the root directory.
 	 */
-	lck_rw_lock_shared(&vol->root_ni->lock);
+	sx_slock(&vol->root_ni->lock);
 	err = ntfs_lookup_inode_by_name(vol->root_ni, hiberfil, 12, &mref,
 			&name);
-	lck_rw_unlock_shared(&vol->root_ni->lock);
+	sx_sunlock(&vol->root_ni->lock);
 	if (err) {
 		/* If the file does not exist, Windows is not hibernated. */
 		if (err == ENOENT) {
@@ -1981,7 +1981,7 @@ static errno_t ntfs_windows_hibernation_status_check(ntfs_volume *vol,
 unm:
 	ntfs_page_unmap(ni, upl, pl, FALSE);
 put:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
 	(void)vnode_put(ni->vn);
 	return err;
@@ -2238,10 +2238,10 @@ static errno_t ntfs_objid_load(ntfs_volume *vol)
 	 * Find the inode number for the object id file by looking up the
 	 * filename $ObjId in the extended system files directory $Extend.
 	 */
-	lck_rw_lock_shared(&vol->extend_ni->lock);
+	sx_slock(&vol->extend_ni->lock);
 	err = ntfs_lookup_inode_by_name(vol->extend_ni, ObjId, 6, &mref,
 			&name);
-	lck_rw_unlock_shared(&vol->extend_ni->lock);
+	sx_sunlock(&vol->extend_ni->lock);
 	if (err) {
 		/*
 		 * If the file does not exist, there are no object ids in use
@@ -2301,10 +2301,10 @@ static errno_t ntfs_quota_load(ntfs_volume *vol)
 	 * Find the inode number for the quota file by looking up the filename
 	 * $Quota in the extended system files directory $Extend.
 	 */
-	lck_rw_lock_shared(&vol->extend_ni->lock);
+	sx_slock(&vol->extend_ni->lock);
 	err = ntfs_lookup_inode_by_name(vol->extend_ni, Quota, 6, &mref,
 			&name);
-	lck_rw_unlock_shared(&vol->extend_ni->lock);
+	sx_sunlock(&vol->extend_ni->lock);
 	if (err) {
 		/*
 		 * If the file does not exist, quotas are disabled and have
@@ -2383,10 +2383,10 @@ static errno_t ntfs_usnjrnl_load(ntfs_volume *vol)
 	 * Find the inode number for the transaction log file by looking up the
 	 * filename $UsnJrnl in the extended system files directory $Extend.
 	 */
-	lck_rw_lock_shared(&vol->extend_ni->lock);
+	sx_slock(&vol->extend_ni->lock);
 	err = ntfs_lookup_inode_by_name(vol->extend_ni, UsnJrnl, 8, &mref,
 			&name);
-	lck_rw_unlock_shared(&vol->extend_ni->lock);
+	sx_sunlock(&vol->extend_ni->lock);
 	if (err) {
 		/*
 		 * If the file does not exist, transaction logging is disabled,
@@ -2453,7 +2453,7 @@ not_enabled:
 				"$UsnJrnl/$DATA/$Max.");
 		return err;
 	}
-	lck_rw_lock_shared(&max_ni->lock);
+	sx_slock(&max_ni->lock);
 	/* Read the USN_HEADER from $DATA/$Max. */
 	err = ntfs_page_map(max_ni, 0, &upl, &pl, (u8**)&uh, FALSE);
 	if (err) {
@@ -2498,7 +2498,7 @@ not_enabled:
 	if (sle64_to_cpu(uh->lowest_valid_usn) >= data_size) {
 		if (sle64_to_cpu(uh->lowest_valid_usn) == data_size) {
 			ntfs_page_unmap(max_ni, upl, pl, FALSE);
-			lck_rw_unlock_shared(&max_ni->lock);
+			sx_sunlock(&max_ni->lock);
 			(void)vnode_put(max_ni->vn);
 			ntfs_debug("$UsnJrnl is enabled but nothing has been "
 					"logged since it was last stamped.  "
@@ -2519,7 +2519,7 @@ not_enabled:
 unm_err:
 	ntfs_page_unmap(max_ni, upl, pl, FALSE);
 put_err:
-	lck_rw_unlock_shared(&max_ni->lock);
+	sx_sunlock(&max_ni->lock);
 	(void)vnode_put(max_ni->vn);
 	return err;
 }
@@ -3053,7 +3053,7 @@ static errno_t ntfs_get_nr_set_bits(vnode_t vn, const s64 nr_bits, s64 *res)
 	err = vnode_get(vn);
 	if (err)
 		return err;
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Convert the number of bits into bytes rounded up. */
 	max_ofs = (nr_bits + 7) >> 3;
 	ntfs_debug("Reading bitmap, max_ofs %lld.", (long long)max_ofs);
@@ -3091,7 +3091,7 @@ static errno_t ntfs_get_nr_set_bits(vnode_t vn, const s64 nr_bits, s64 *res)
 	 * Release the iocount reference on the bitmap vnode.  We can ignore
 	 * the return value as it always is zero.
 	 */
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(vn);
 	ntfs_debug("Done (nr_bits %lld, nr_set %lld).", (long long)nr_bits,
 			(long long)nr_set);
@@ -4086,7 +4086,7 @@ static int ntfs_mountfs(devvp, mp, td)
 	sx_init(&vol->lcnbmp_lock, "lcnbmp lock");
 	sx_init(&vol->secure_lock, "secure lock");
 	/*
- 	*FIXME: Do we realy need spinlock here ?
+ 	* FIXME: Do we realy need spinlock here ?
  	*/
 	mtx_init(&vol->security_id_lock, "security id lock", NULL, MTX_SPIN);
 
@@ -4431,7 +4431,7 @@ static int ntfs_vget(mount_t mp, ino64_t ino, struct vnode **vpp,
 	err = ntfs_inode_get(NTFS_MP(mp), ino, FALSE, LCK_RW_TYPE_SHARED, &ni,
 			NULL, NULL);
 	if (!err) {
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 done:
 		ntfs_debug("Done.");
 		*vpp = ni->vn;
@@ -4907,7 +4907,7 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 		VFSATTR_SET_SUPPORTED(fsa, f_attributes);
 	}
 	ni = vol->root_ni;
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/*
 	 * For the volume times, we use the corresponding times from the
 	 * standard information attribute of the root directory inode.
@@ -4926,12 +4926,12 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 	if (VFSATTR_IS_ACTIVE(fsa, f_backup_time)) {
 		if (NInoValidBackupTime(ni)) {
 			VFSATTR_RETURN(fsa, f_backup_time, ni->backup_time);
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		} else {
 			errno_t err;
 
-			if (!lck_rw_lock_shared_to_exclusive(&ni->lock))
-				lck_rw_lock_exclusive(&ni->lock);
+			if (!sx_try_upgrade(&ni->lock))
+				sx_xlock(&ni->lock);
 			/*
 			 * Load the AFP_AfpInfo stream and initialize the
 			 * backup time and Finder Info (if they are not already
@@ -4944,17 +4944,17 @@ static int ntfs_getattr(mount_t mp, struct vfs_attr *fsa,
 						"%d).",
 						(unsigned long long)ni->mft_no,
 						err);
-				lck_rw_unlock_exclusive(&ni->lock);
+				sx_xunlock(&ni->lock);
 				return err;
 			}
 			if (!NInoValidBackupTime(ni))
 				panic("%s(): !NInoValidBackupTime(base_ni)\n",
 						__FUNCTION__);
 			VFSATTR_RETURN(fsa, f_backup_time, ni->backup_time);
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 		}
 	} else
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	/*
 	 * File system subtype.  Set this to the ntfs version encoded into 16
 	 * bits, the high 8 bits being the major version and the low 8 bits
@@ -5213,9 +5213,9 @@ retry_resize:
 			 * record.  Move it out to an extent mft record which
 			 * will cause enough space to be generated.
 			 */
-			lck_rw_lock_shared(&ni->attr_list_rl.lock);
+			sx_slock(&ni->attr_list_rl.lock);
 			err = ntfs_attr_record_move(ctx);
-			lck_rw_unlock_shared(&ni->attr_list_rl.lock);
+			sx_sunlock(&ni->attr_list_rl.lock);
 			if (err) {
 				ntfs_error(vol->mp, "Failed to move volume "
 						"name attribute to an extent "

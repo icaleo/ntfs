@@ -91,7 +91,7 @@ errno_t ntfs_attr_map_runlist(ntfs_inode *ni)
 		ntfs_debug("Done (resident, nothing to do).");
 		return 0;
 	}
-	lck_rw_lock_exclusive(&ni->rl.lock);
+	sx_xlock(&ni->rl.lock);
 	/* Verify that the runlist is not mapped yet. */
 	if (ni->rl.alloc && ni->rl.elements)
 		panic("%s(): ni->rl.alloc && ni->rl.elements\n", __FUNCTION__);
@@ -156,7 +156,7 @@ unm_err:
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(base_ni);
 err:
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	if (!err)
 		ntfs_debug("Done.");
 	else
@@ -456,7 +456,7 @@ retry_remap:
 	lcn = ntfs_rl_vcn_to_lcn(ni->rl.rl, vcn, clusters);
 	if (lcn >= LCN_HOLE) {
 		if (need_lock_switch)
-			lck_rw_lock_exclusive_to_shared(&ni->rl.lock);
+			sx_downgrade(&ni->rl.lock);
 		ntfs_debug("Done (lcn 0x%llx, clusters 0x%llx).",
 				(unsigned long long)lcn,
 				clusters ? (unsigned long long)*clusters : 0);
@@ -476,8 +476,8 @@ try_to_map:
 			 * fails, need to take the lock for writing and retry
 			 * in case the racing process did the mapping for us.
 			 */
-			if (!lck_rw_lock_shared_to_exclusive(&ni->rl.lock)) {
-				lck_rw_lock_exclusive(&ni->rl.lock);
+			if (!sx_try_upgrade(&ni->rl.lock)) {
+				sx_xlock(&ni->rl.lock);
 				goto retry_remap;
 			}
 		}
@@ -499,7 +499,7 @@ try_to_map:
 	}
 lcn_eio:
 	if (need_lock_switch)
-		lck_rw_lock_exclusive_to_shared(&ni->rl.lock);
+		sx_downgrade(&ni->rl.lock);
 	if (lcn == LCN_ENOENT) {
 lcn_enoent:
 		ntfs_debug("Done (LCN_ENOENT).");
@@ -2078,9 +2078,9 @@ add_compressed_size:
 			goto restart_compressed_size_add;
 		}
 		/* Move the attribute to an extent mft record. */
-		lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+		sx_slock(&base_ni->attr_list_rl.lock);
 		err = ntfs_attr_record_move(ctx);
-		lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+		sx_sunlock(&base_ni->attr_list_rl.lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to move attribute extent "
 					"from mft record 0x%llx to an extent "
@@ -2962,7 +2962,7 @@ errno_t ntfs_attr_make_non_resident(ntfs_inode *ni)
 	lck_spin_unlock(&ni->size_lock);
 	new_size = (data_size + vol->cluster_size_mask) &
 			~vol->cluster_size_mask;
-	lck_rw_lock_exclusive(&ni->rl.lock);
+	sx_xlock(&ni->rl.lock);
 	if (ni->rl.elements)
 		panic("%s(): ni->rl.elements\n", __FUNCTION__);
 	upl = NULL;
@@ -3160,9 +3160,9 @@ retry_resize:
 	type = ni->type;
 	if (type != AT_STANDARD_INFORMATION && type != AT_INDEX_ROOT &&
 			(type != AT_DATA || ni->name_len)) {
-		lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+		sx_slock(&base_ni->attr_list_rl.lock);
 		err = ntfs_attr_record_move(&ctx);
-		lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+		sx_sunlock(&base_ni->attr_list_rl.lock);
 		if (!err) {
 			/* The attribute has moved so update our variables. */
 			m = ctx.m;
@@ -3476,7 +3476,7 @@ do_switch:
 		NInoSetMrecNeedsDirtying(base_ni);
 	}
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	/*
 	 * We have modified the allocated size.  If the ntfs inode is the base
 	 * inode, cause the sizes to be written to all the directory index
@@ -3536,7 +3536,7 @@ page_err:
 			panic("%s(): err2\n", __FUNCTION__);
 	}
 unl_err:
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	if (err == EINVAL)
 		err = EIO;
 	return err;
@@ -4211,7 +4211,7 @@ do_non_resident_extend:
 		BOOL have_holes = FALSE;
 
 		locked = TRUE;
-		lck_rw_lock_shared(&ni->rl.lock);
+		sx_slock(&ni->rl.lock);
 		vcn = ofs >> vol->cluster_size_shift;
 		end_vcn = (new_init_size + vol->cluster_size_mask) >>
 				vol->cluster_size_shift;
@@ -4221,9 +4221,8 @@ retry_remap:
 map_vcn:
 			if (!write_locked) {
 				write_locked = TRUE;
-				if (!lck_rw_lock_shared_to_exclusive(
-						&ni->rl.lock)) {
-					lck_rw_lock_exclusive(&ni->rl.lock);
+				if (!sx_try_upgrade(&ni->rl.lock)) {
+					sx_xlock(&ni->rl.lock);
 					goto retry_remap;
 				}
 			}
@@ -4299,7 +4298,7 @@ map_vcn:
 		 */
 		if (have_holes) {
 			if (write_locked) {
-				lck_rw_lock_exclusive_to_shared(&ni->rl.lock);
+				sx_downgrade(&ni->rl.lock);
 				write_locked = FALSE;
 			}
 			/*
@@ -4313,9 +4312,9 @@ map_vcn:
 			rl = ni->rl.rl;
 		} else {
 			if (write_locked)
-				lck_rw_unlock_exclusive(&ni->rl.lock);
+				sx_xunlock(&ni->rl.lock);
 			else
-				lck_rw_unlock_shared(&ni->rl.lock);
+				sx_sunlock(&ni->rl.lock);
 			locked = FALSE;
 			is_sparse = FALSE;
 		}
@@ -4418,7 +4417,7 @@ on_disk_page:
 // not.  Or perhaps just remove the warning and use this as the solution.
 			if (locked && write_locked) {
 				write_locked = FALSE;
-				lck_rw_lock_exclusive_to_shared(&ni->rl.lock);
+				sx_downgrade(&ni->rl.lock);
 				ntfs_warning(vol->mp, "Switching runlist lock "
 						"to shared to avoid "
 						"deadlock.");
@@ -4449,9 +4448,9 @@ update_done:
 	/* If we are holding the runlist lock, release it now. */
 	if (locked) {
 		if (write_locked)
-			lck_rw_unlock_exclusive(&ni->rl.lock);
+			sx_xunlock(&ni->rl.lock);
 		else
-			lck_rw_unlock_shared(&ni->rl.lock);
+			sx_sunlock(&ni->rl.lock);
 		locked = FALSE;
 	}
 	/* Bring up to date the initialized_size in the attribute record. */
@@ -4477,9 +4476,9 @@ rl_err:
 unl_err:
 	if (locked) {
 		if (write_locked)
-			lck_rw_unlock_exclusive(&ni->rl.lock);
+			sx_xunlock(&ni->rl.lock);
 		else
-			lck_rw_unlock_shared(&ni->rl.lock);
+			sx_sunlock(&ni->rl.lock);
 	}
 	lck_spin_lock(&ni->size_lock);
 	ni->initialized_size = old_init_size;
@@ -4628,9 +4627,9 @@ retry_attr_rec_resize:
 	 * enough space to add the compressed size to the attribute record.
 	 */
 	if (!ntfs_attr_record_is_only_one(m, a)) {
-		lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+		sx_slock(&base_ni->attr_list_rl.lock);
 		err = ntfs_attr_record_move(ctx);
-		lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+		sx_sunlock(&base_ni->attr_list_rl.lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to move attribute extent "
 					"from mft record 0x%llx to an extent "
@@ -5209,7 +5208,7 @@ errno_t ntfs_attr_instantiate_holes(ntfs_inode *ni, s64 start, s64 end,
 		base_ni = ni->base_ni;
 	if (!new_end)
 		atomic = TRUE;
-	lck_rw_lock_shared(&ni->rl.lock);
+	sx_slock(&ni->rl.lock);
 	write_locked = FALSE;
 	/*
 	 * We have to round down @start to the nearest page boundary and we
@@ -5244,8 +5243,8 @@ retry_remap:
 map_vcn:
 		if (!write_locked) {
 			write_locked = TRUE;
-			if (!lck_rw_lock_shared_to_exclusive(&ni->rl.lock)) {
-				lck_rw_lock_exclusive(&ni->rl.lock);
+			if (!sx_try_upgrade(&ni->rl.lock)) {
+				sx_xlock(&ni->rl.lock);
 				goto retry_remap;
 			}
 		}
@@ -5307,8 +5306,8 @@ map_vcn:
 		 */
 		if (!write_locked) {
 			write_locked = TRUE;
-			if (!lck_rw_lock_shared_to_exclusive(&ni->rl.lock)) {
-				lck_rw_lock_exclusive(&ni->rl.lock);
+			if (!sx_try_upgrade(&ni->rl.lock)) {
+				sx_xlock(&ni->rl.lock);
 				goto retry_remap;
 			}
 		}
@@ -5609,9 +5608,9 @@ retry_attr_rec_resize:
 		 * number of extent attribute records needed to a minimum.
 		 */
 		if (!ntfs_attr_record_is_only_one(m, a)) {
-			lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+			sx_slock(&base_ni->attr_list_rl.lock);
 			err = ntfs_attr_record_move(ctx);
-			lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+			sx_sunlock(&base_ni->attr_list_rl.lock);
 			if (err) {
 				ntfs_error(vol->mp, "Failed to move attribute "
 						"extent from mft record "
@@ -5759,9 +5758,9 @@ err:
 	if (new_end)
 		*new_end = vcn << vol->cluster_size_shift;
 	if (write_locked)
-		lck_rw_unlock_exclusive(&ni->rl.lock);
+		sx_xunlock(&ni->rl.lock);
 	else
-		lck_rw_unlock_shared(&ni->rl.lock);
+		sx_sunlock(&ni->rl.lock);
 	return err;
 undo_alloc:
 	err2 = ntfs_cluster_free_from_rl(vol, runlist.rl, 0, -1, NULL);
@@ -6028,7 +6027,7 @@ retry_extend:
 	 * We will be modifying both the runlist (if non-resident) and the mft
 	 * record so lock them both down.
 	 */
-	lck_rw_lock_exclusive(&ni->rl.lock);
+	sx_xlock(&ni->rl.lock);
 	err = ntfs_mft_record_map(base_ni, &base_m);
 	if (err) {
 		base_m = NULL;
@@ -6140,7 +6139,7 @@ retry_extend:
 	 */
 	ntfs_attr_search_ctx_put(actx);
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	/*
 	 * Not enough space in the mft record, try to make the attribute
 	 * non-resident and if successful restart the extension process.
@@ -6615,7 +6614,7 @@ retry_attr_rec_resize:
 			NVolSetErrors(vol);
 			goto err_out;
 		}
-		lck_rw_unlock_exclusive(&ni->rl.lock);
+		sx_xunlock(&ni->rl.lock);
 		/* Find the index root by walking up the tree path. */
 		root_ictx = ictx;
 		while (!root_ictx->is_root) {
@@ -6783,9 +6782,9 @@ ictx_done:
 		 */
 		if (!ntfs_attr_record_is_only_one(m, a)) {
 move_attr:
-			lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+			sx_slock(&base_ni->attr_list_rl.lock);
 			err = ntfs_attr_record_move(actx);
-			lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+			sx_sunlock(&base_ni->attr_list_rl.lock);
 			if (err) {
 				if (start < 0 || start >= alloc_size)
 					ntfs_error(vol->mp, "Failed to move "
@@ -7377,7 +7376,7 @@ dirty_done:
 done:
 	ntfs_attr_search_ctx_put(actx);
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	ntfs_debug("Done, new_allocated_size 0x%llx.",
 			(unsigned long long)new_alloc_size);
 	if (dst_alloc_size)
@@ -7553,7 +7552,7 @@ undo_skip_update_sizes:
 	ntfs_attr_search_ctx_put(actx);
 	NInoSetMrecNeedsDirtying(base_ni);
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	/*
 	 * Things are now consistent, try to truncate the attribute back to its
 	 * old size which will cause the allocation to be restored to its old
@@ -7585,7 +7584,7 @@ err_out:
 		ntfs_attr_search_ctx_put(actx);
 	if (base_m)
 		ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	goto conv_err_out;
 trunc_err_out:
 	mp_rebuilt = FALSE;
@@ -7708,7 +7707,7 @@ retry_resize:
 	 * Lock the runlist for writing and map the mft record to ensure it is
 	 * safe to modify the attribute runlist and sizes.
 	 */
-	lck_rw_lock_exclusive(&ni->rl.lock);
+	sx_xlock(&ni->rl.lock);
 	err = ntfs_mft_record_map(base_ni, &m);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to map mft record for mft_no "
@@ -7965,7 +7964,7 @@ retry_resize:
 			panic("%s(): ictx->is_locked\n", __FUNCTION__);
 		if (ictx->is_root)
 			panic("%s(): ictx->is_root\n", __FUNCTION__);
-		lck_rw_unlock_exclusive(&ni->rl.lock);
+		sx_xunlock(&ni->rl.lock);
 		/* Find the index root by walking up the tree path. */
 		root_ictx = ictx;
 		while (!root_ictx->is_root) {
@@ -8082,7 +8081,7 @@ ictx_done:
 	 */
 	ntfs_attr_search_ctx_put(actx);
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	/*
 	 * Not enough space in the mft record, try to make the attribute
 	 * non-resident and if successful restart the truncation process.
@@ -8222,7 +8221,7 @@ do_non_resident_resize:
 		 */
 		ntfs_attr_search_ctx_put(actx);
 		ntfs_mft_record_unmap(base_ni);
-		lck_rw_unlock_exclusive(&ni->rl.lock);
+		sx_xunlock(&ni->rl.lock);
 		err = ntfs_attr_extend_allocation(ni, new_size,
 				size_change > 0 ? new_size : -1, -1, ictx,
 				NULL, FALSE);
@@ -8678,7 +8677,7 @@ delete_attr:
 unm_done:
 	ntfs_attr_search_ctx_put(actx);
 	ntfs_mft_record_unmap(base_ni);
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 	/* Set the UBC size if not set yet. */
 	if (need_ubc_setsize && !ubc_setsize(ni->vn, new_size)) {
 		ntfs_error(vol->mp, "Failed to set the size in UBC.");
@@ -8760,7 +8759,7 @@ put_err:
 unm_err:
 	ntfs_mft_record_unmap(base_ni);
 unl_err:
-	lck_rw_unlock_exclusive(&ni->rl.lock);
+	sx_xunlock(&ni->rl.lock);
 err:
 	/* Reset the UBC size. */
 	if (!ubc_setsize(ni->vn, old_size))

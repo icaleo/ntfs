@@ -621,12 +621,12 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		ntfs_error(vol->mp, "Not a directory.");
 		return ENOTDIR;
 	}
-	lck_rw_lock_shared(&dir_ni->lock);
+	sx_slock(&dir_ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(dir_ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(dir_ni->vn);
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		ntfs_debug("Parent directory is deleted.");
 		return ENOENT;
 	}
@@ -645,19 +645,19 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	if (err) {
 		if (err == -1) {
 			ni = NTFS_I(vn);
-			lck_rw_lock_shared(&ni->lock);
+			sx_slock(&ni->lock);
 			/*
 			 * Do not allow messing with the inode once it has been
 			 * deleted.
 			 */
 			if (!NInoDeleted(ni)) {
-				lck_rw_unlock_shared(&ni->lock);
-				lck_rw_unlock_shared(&dir_ni->lock);
+				sx_sunlock(&ni->lock);
+				sx_sunlock(&dir_ni->lock);
 				*a->a_vpp = vn;
 				ntfs_debug("Done (cached).");
 				return 0;
 			}
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 			/* Remove the inode from the name cache. */
 			cache_purge(vn);
 			vnode_put(vn);
@@ -665,7 +665,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 					"found, purged from cache and doing "
 					"real lookup.");
 		} else {
-			lck_rw_unlock_shared(&dir_ni->lock);
+			sx_sunlock(&dir_ni->lock);
 			if (err == ENOENT) {
 				ntfs_debug("Done (cached, negative).");
 				return err;
@@ -680,13 +680,13 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		/* "." is not cached. */
 		cn->cn_flags &= ~MAKEENTRY;
 		if (op == RENAME) {
-			lck_rw_unlock_shared(&dir_ni->lock);
+			sx_sunlock(&dir_ni->lock);
 			ntfs_debug("Op is RENAME but name is \".\", returning "
 					"EISDIR.");
 			return EISDIR;
 		}
 		err = vnode_get(dir_ni->vn);
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to get iocount reference "
 					"on current directory (error %d).",
@@ -702,7 +702,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		cn->cn_flags &= ~MAKEENTRY;
 		vn = vnode_getparent(dir_ni->vn);
 		if (vn) {
-			lck_rw_unlock_shared(&dir_ni->lock);
+			sx_sunlock(&dir_ni->lock);
 			ntfs_debug("Got \"..\" directory 0x%llx of directory "
 					"0x%llx.",
 					(unsigned long long)NTFS_I(vn)->mft_no,
@@ -717,7 +717,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		 */
 		err = ntfs_inode_get_name_and_parent_mref(dir_ni, FALSE, &mref,
 				NULL);
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to obtain parent mft "
 					"reference for directory 0x%llx "
@@ -739,7 +739,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		}
 		/* Consistency check. */
 		if (MSEQNO(mref) != ni->seq_no) {
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 			(void)vnode_put(ni->vn);
 			ntfs_error(vol->mp, "Found stale parent mft reference "
 					"in filename of directory 0x%llx.  "
@@ -748,7 +748,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 			return EIO;
 		}
 		if (!S_ISDIR(ni->mode)) {
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 			(void)vnode_put(ni->vn);
 			ntfs_error(vol->mp, "Found non-directory parent for "
 					"filename of directory 0x%llx.  "
@@ -760,7 +760,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 				(unsigned long long)mft_no,
 				(unsigned long long)dir_ni->mft_no);
 		*a->a_vpp = ni->vn;
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		return 0;
 	}
 	/* Convert the name from utf8 to Unicode. */
@@ -769,7 +769,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	ntfs_name_len = utf8_to_ntfs(vol, (u8*)cn->cn_nameptr, cn->cn_namelen,
 			&ntfs_name, &ntfs_name_size);
 	if (ntfs_name_len < 0) {
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		err = -ntfs_name_len;
 		if (err == ENAMETOOLONG)
 			ntfs_debug("Failed (name is too long).");
@@ -782,7 +782,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	err = ntfs_lookup_inode_by_name(dir_ni, ntfs_name, ntfs_name_len,
 			&mref, &name);
 	if (err) {
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		if (err != ENOENT) {
 			ntfs_error(vol->mp, "Failed to find name in directory "
 					"(error %d).", err);
@@ -831,7 +831,7 @@ not_found:
 	 * are both expected by Carbon and various applications.
 	 */
 	if (mft_no < FILE_first_user) {
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		if (name)
 			free(name, M_NTFS);
 		ntfs_debug("Removing core NTFS system file (mft_no 0x%x) "
@@ -877,7 +877,7 @@ not_found:
 					&utf8_size);
 			free(name, M_NTFS);
 			if (res_size < 0) {
-				lck_rw_unlock_shared(&dir_ni->lock);
+				sx_sunlock(&dir_ni->lock);
 				/* Failed to convert name. */
 				err = -res_size;
 				ntfs_error(vol->mp, "Failed to convert inode "
@@ -906,7 +906,7 @@ not_found:
 	 */
 	err = ntfs_inode_get(vol, mft_no, FALSE, LCK_RW_TYPE_SHARED, &ni,
 			dir_ni->vn, name_cn);
-	lck_rw_unlock_shared(&dir_ni->lock);
+	sx_sunlock(&dir_ni->lock);
 	if (name_cn == &cn_buf) {
 		/* Pick up any modifications to the cn_flags. */
 		cn->cn_flags = cn_buf.cn_flags;
@@ -917,7 +917,7 @@ not_found:
 		// FIXME: I cannot remember why we need the "mft_no !=
 		// FILE_MFT" test...
 		if (MSEQNO(mref) != ni->seq_no && mft_no != FILE_MFT) {
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 			(void)vnode_put(ni->vn);
 			ntfs_debug("Inode was deleted and reused under our "
 					"feet.");
@@ -943,7 +943,7 @@ not_found:
 				*a->a_vpp = ni->vn;
 				ntfs_debug("Done (case %d).",
 						name_cn == &cn_buf ? 2 : 1);
-				lck_rw_unlock_shared(&ni->lock);
+				sx_sunlock(&ni->lock);
 				return 0;
 			}
 			/*
@@ -952,7 +952,7 @@ not_found:
 			 */
 			goto handle_dos_name;
 		}
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);
 		ntfs_debug("Done (intermediate path component requested but "
 				"found inode is not a directory or symbolic "
@@ -1063,7 +1063,7 @@ handle_dos_name:
 	cn->cn_flags &= ~MAKEENTRY;
 	free(utf8_name, M_NTFS);
 	*a->a_vpp = ni->vn;
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	ntfs_debug("Done (case 3).");
 	return 0;
 attr_err:
@@ -1074,7 +1074,7 @@ put_err:
 unm_err:
 	ntfs_mft_record_unmap(ni);
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(vn);
 	return err;
    }
@@ -1224,7 +1224,7 @@ static errno_t ntfs_create(vnode_t dir_vn, vnode_t *vn,
 			VNODE_ATTR_BIT(va_type);
 again:
 	/* Lock the target directory and check that it has not been deleted. */
-	lck_rw_lock_exclusive(&dir_ni->lock);
+	sx_xlock(&dir_ni->lock);
 	if (!dir_ni->link_count) {
 		/* Remove the target directory from the name cache. */
 		cache_purge(dir_vn);
@@ -1252,7 +1252,7 @@ again:
 	 * setting up the inode.
 	 */
 	if (lock || S_ISLNK(ni->mode))
-		lck_rw_lock_exclusive(&ni->lock);
+		sx_xlock(&ni->lock);
 	/*
 	 * @a now points to the location in the allocated mft record at which
 	 * we need to insert the filename attribute so we can insert it without
@@ -1319,7 +1319,7 @@ again:
 		 * locked unlock it now.
 		 */
 		if (!lock)
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to create AFP_AfpInfo "
 					"attribute in allocated inode 0x%llx "
@@ -1351,7 +1351,7 @@ again:
 		 */
 		cache_enter(dir_ni->vn, ni->vn, cn);
 		/* We are done with the directory so unlock it. */
-		lck_rw_unlock_exclusive(&dir_ni->lock);
+		sx_xunlock(&dir_ni->lock);
 		/*
 		 * We can finally unlock and unmark as new the new ntfs inode
 		 * thus rendering the inode a full member of society.
@@ -1378,7 +1378,7 @@ again:
 	 */
 rm_err:
 	if (lock)
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	err2 = ntfs_mft_record_map(ni, &m);
 	if (err2) {
 		ntfs_error(vol->mp, "Failed to map mft record in error code "
@@ -1391,7 +1391,7 @@ rm_err:
 		ntfs_mft_record_unmap(ni);
 	}
 	ni->link_count = 0;
-	lck_rw_unlock_exclusive(&dir_ni->lock);
+	sx_xunlock(&dir_ni->lock);
 	ntfs_inode_unlock_alloc(ni);
 	cache_purge(ni->vn);
 	(void)vnode_put(ni->vn);
@@ -1485,7 +1485,7 @@ err:
 	free(fn, M_NTFS);
 	return err;
 unl_err:
-	lck_rw_unlock_exclusive(&dir_ni->lock);
+	sx_xunlock(&dir_ni->lock);
 	goto err;
 is_system:
 	ntfs_error(vol->mp, "Cannot create inode with name %.*s in the volume "
@@ -1621,10 +1621,10 @@ static int ntfs_vnop_open(struct vnop_open_args *a)
 	if (ni->mft_no < FILE_first_user && ni != ni->vol->root_ni)
 		panic("%s(): Called for a system inode.  This is not "
 				"possible.\n", __FUNCTION__);
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		/* Remove the inode from the name cache. */
 		cache_purge(ni->vn);
 		ntfs_debug("Cannot open deleted mft_no 0x%llx, returning "
@@ -1636,12 +1636,12 @@ static int ntfs_vnop_open(struct vnop_open_args *a)
 	 * writing, nor mmap()ing them.
 	 */
 	if (NInoEncrypted(ni)) {
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		ntfs_debug("Cannot open encrypted mft_no 0x%llx, returning "
 				"EACCES.", (unsigned long long)ni->mft_no);
 		return EACCES;
 	}
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	/*
 	 * We keep track of how many times the base vnode has been opened and
 	 * we count other vnodes towards the base vnode open count to ensure
@@ -1700,9 +1700,9 @@ static int ntfs_vnop_close(struct vnop_close_args *a)
 		int busy;
 
 		busy = vnode_isinuse(vn, ni->nr_refs + 1);
-		lck_rw_lock_exclusive(&ni->lock);
+		sx_xlock(&ni->lock);
 		ntfs_dirhints_put(ni, busy);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	}
 	ntfs_debug("Done.");
 	return 0;
@@ -1772,9 +1772,9 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 	base_ni = ni;
 	if (NInoAttr(ni)) {
 		base_ni = ni->base_ni;
-		lck_rw_lock_shared(&base_ni->lock);
+		sx_slock(&base_ni->lock);
 	}
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	lock = LCK_RW_TYPE_SHARED;
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
@@ -2054,14 +2054,14 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 	 * exclusive and with the call to ntfs_inode_afpinfo_read() below.
 	 */
 	if (ni != base_ni)
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	if (VATTR_IS_ACTIVE(va, va_backup_time)) {
 		if (!NInoValidBackupTime(base_ni)) {
-			if (!lck_rw_lock_shared_to_exclusive(&base_ni->lock)) {
-				lck_rw_lock_exclusive(&base_ni->lock);
+			if (!sx_try_upgrade(&base_ni->lock)) {
+				sx_xlock(&base_ni->lock);
 				if (NInoDeleted(base_ni)) {
 					cache_purge(base_ni->vn);
-					lck_rw_unlock_exclusive(&base_ni->lock);
+					sx_xunlock(&base_ni->lock);
 					return ENOENT;
 				}
 			}
@@ -2078,7 +2078,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 						"from inode 0x%llx (error "
 						"%d).", (unsigned long long)
 						base_ni->mft_no, err);
-				lck_rw_unlock_exclusive(&base_ni->lock);
+				sx_xunlock(&base_ni->lock);
 				return err;
 			}
 			if (!NInoValidBackupTime(base_ni))
@@ -2088,15 +2088,15 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 		VATTR_RETURN(va, va_backup_time, base_ni->backup_time);
 	}
 	if (lock == LCK_RW_TYPE_SHARED)
-		lck_rw_unlock_shared(&base_ni->lock);
+		sx_sunlock(&base_ni->lock);
 	else
-		lck_rw_unlock_exclusive(&base_ni->lock);
+		sx_xunlock(&base_ni->lock);
 	ntfs_debug("Done.");
 	return 0;
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	if (ni != base_ni)
-		lck_rw_unlock_shared(&base_ni->lock);
+		sx_sunlock(&base_ni->lock);
 	return err;
 }
 
@@ -2140,9 +2140,9 @@ static int ntfs_vnop_setattr(struct vnop_setattr_args *a)
 	base_ni = ni;
 	if (NInoAttr(ni)) {
 		base_ni = ni->base_ni;
-		lck_rw_lock_exclusive(&base_ni->lock);
+		sx_xlock(&base_ni->lock);
 	}
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -2186,7 +2186,7 @@ static int ntfs_vnop_setattr(struct vnop_setattr_args *a)
 	 * cannot deadlock with the call to ntfs_inode_afpinfo_write() below.
 	 */
 	if (ni != base_ni)
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	if (VATTR_IS_ACTIVE(va, va_flags)) {
 		u32 flags = va->va_flags;
 		BOOL dirty_flags = FALSE;
@@ -2375,11 +2375,11 @@ static int ntfs_vnop_setattr(struct vnop_setattr_args *a)
 	}
 	ntfs_debug("Done.");
 err:
-	lck_rw_unlock_exclusive(&base_ni->lock);
+	sx_xunlock(&base_ni->lock);
 	return err;
 unl_err:
 	if (ni != base_ni)
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	goto err;
 }
 
@@ -2661,7 +2661,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 			(ofs = uio_offset(uio)) < data_size);
 	ntfs_debug("Done.");
 err:
-	lck_rw_unlock_shared(&raw_ni->lock);
+	sx_sunlock(&raw_ni->lock);
 	(void)vnode_put(raw_ni->vn);
 	return err;
 unm_err:
@@ -2773,11 +2773,11 @@ static errno_t ntfs_read(ntfs_inode *ni, uio_t uio, const int ioflags,
 	 * truncation also.
 	 */
 	if (!locked)
-		lck_rw_lock_shared(&ni->lock);
+		sx_slock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		if (!locked)
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		/* Remove the inode from the name cache. */
 		cache_purge(ni->vn);
 		return ENOENT;
@@ -2954,7 +2954,7 @@ err:
 		}
 	}
 	if (!locked)
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	return err;
 }
 
@@ -3140,7 +3140,7 @@ static errno_t ntfs_write(ntfs_inode *ni, uio_t uio, int ioflags,
 	was_locked = write_locked;
 	if (ioflags & IO_APPEND) {
 		if (!was_locked) {
-			lck_rw_lock_exclusive(&ni->lock);
+			sx_xlock(&ni->lock);
 			write_locked = TRUE;
 		}
 		/*
@@ -3149,7 +3149,7 @@ static errno_t ntfs_write(ntfs_inode *ni, uio_t uio, int ioflags,
 		 */
 		if (NInoDeleted(ni)) {
 			if (!was_locked)
-				lck_rw_unlock_exclusive(&ni->lock);
+				sx_xunlock(&ni->lock);
 			/* Remove the inode from the name cache. */
 			cache_purge(ni->vn);
 			return ENOENT;
@@ -3167,10 +3167,10 @@ static errno_t ntfs_write(ntfs_inode *ni, uio_t uio, int ioflags,
 	} else {
 		if (!was_locked) {
 			if (NInoSparse(ni)) {
-				lck_rw_lock_exclusive(&ni->lock);
+				sx_xlock(&ni->lock);
 				write_locked = TRUE;
 			} else {
-				lck_rw_lock_shared(&ni->lock);
+				sx_slock(&ni->lock);
 				write_locked = FALSE;
 			}
 		}
@@ -3182,9 +3182,9 @@ recheck_deleted:
 		if (NInoDeleted(ni)) {
 			if (!was_locked) {
 				if (write_locked)
-					lck_rw_unlock_exclusive(&ni->lock);
+					sx_xunlock(&ni->lock);
 				else
-					lck_rw_unlock_shared(&ni->lock);
+					sx_sunlock(&ni->lock);
 			}
 			/* Remove the inode from the name cache. */
 			cache_purge(ni->vn);
@@ -3195,8 +3195,8 @@ recheck_deleted:
 		lck_spin_unlock(&ni->size_lock);
 		if (!write_locked && end > size) {
 			/* If we fail to convert the lock, take it. */
-			if (!lck_rw_lock_shared_to_exclusive(&ni->lock))
-				lck_rw_lock_exclusive(&ni->lock);
+			if (!sx_try_upgrade(&ni->lock))
+				sx_xlock(&ni->lock);
 			write_locked = TRUE;
 			goto recheck_deleted;
 		}
@@ -3259,7 +3259,7 @@ recheck_deleted:
 			uio_setoffset(uio, old_ofs);
 			uio_setresid(uio, old_count);
 			if (!was_locked)
-				lck_rw_unlock_exclusive(&ni->lock);
+				sx_xunlock(&ni->lock);
 			return err;
 		}
 		/* If the instantiation was partial, truncate the write. */
@@ -3712,9 +3712,9 @@ abort:
 skip_truncate:
 	if (!was_locked) {
 		if (!write_locked)
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		else
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 		/*
 		 * If the write was successful and synchronous i/o was
 		 * requested, sync all changes to the backing store.  We
@@ -4197,7 +4197,7 @@ restart_name:
 						"vnode for $ObjId/$O.");
 				goto err;
 			}
-			lck_rw_lock_exclusive(&objid_o_ni->lock);
+			sx_xlock(&objid_o_ni->lock);
 			ictx = ntfs_index_ctx_get(objid_o_ni);
 			if (!ictx) {
 				ntfs_error(vol->mp, "Failed to get index "
@@ -4258,7 +4258,7 @@ restart_ictx:
 				goto iput_err;
 			}
 			ntfs_index_ctx_put(ictx);
-			lck_rw_unlock_exclusive(&objid_o_ni->lock);
+			sx_xunlock(&objid_o_ni->lock);
 			(void)vnode_put(objid_o_ni->vn);
 			/*
 			 * Now get back the mft record so we can re-look up the
@@ -4614,7 +4614,7 @@ err:
 iput_err:
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
-	lck_rw_unlock_exclusive(&objid_o_ni->lock);
+	sx_xunlock(&objid_o_ni->lock);
 	(void)vnode_put(objid_o_ni->vn);
 	return err;
 }
@@ -4704,8 +4704,8 @@ static errno_t ntfs_unlink(ntfs_inode *dir_ni, ntfs_inode *ni,
 		return EINVAL;
 	}
 	/* Lock both the parent directory and the target inode for writing. */
-	lck_rw_lock_exclusive(&dir_ni->lock);
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&dir_ni->lock);
+	sx_xlock(&ni->lock);
 	/* Ensure the parent directory has not been deleted. */
 	if (!dir_ni->link_count) {
 		ntfs_debug("Parent directory mft_no 0x%llx has been deleted, "
@@ -4953,8 +4953,8 @@ enoent:
 err:
 	if (name)
 		free(name, M_NTFS);
-	lck_rw_unlock_exclusive(&ni->lock);
-	lck_rw_unlock_exclusive(&dir_ni->lock);
+	sx_xunlock(&ni->lock);
+	sx_xunlock(&dir_ni->lock);
 	return err;
 }
 
@@ -5424,10 +5424,10 @@ static int ntfs_vnop_link(struct vnop_link_args *a)
 		return ENOTDIR;
 	}
 	/* Lock the target directory inode for writing. */
-	lck_rw_lock_exclusive(&dir_ni->lock);
+	sx_xlock(&dir_ni->lock);
 	/* The inode being linked to must not be a directory. */
 	if (S_ISDIR(ni->mode)) {
-		lck_rw_unlock_exclusive(&dir_ni->lock);
+		sx_xunlock(&dir_ni->lock);
 		ntfs_debug("Mft_no 0x%llx to link to is a directory, cannot "
 				"create hard link %.*s to it, returning "
 				"EPERM.", (unsigned long long)ni->mft_no,
@@ -5435,7 +5435,7 @@ static int ntfs_vnop_link(struct vnop_link_args *a)
 		return EPERM;
 	}
 	/* Lock the inode to link to for writing. */
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Ensure the target directory has not been deleted. */
 	if (!dir_ni->link_count) {
 		ntfs_debug("Target directory mft_no 0x%llx has been deleted, "
@@ -5575,8 +5575,8 @@ static int ntfs_vnop_link(struct vnop_link_args *a)
 		ntfs_debug("Done.");
 err:
 	/* We are done, unlock the inode and the target directory. */
-	lck_rw_unlock_exclusive(&ni->lock);
-	lck_rw_unlock_exclusive(&dir_ni->lock);
+	sx_xunlock(&ni->lock);
+	sx_xunlock(&dir_ni->lock);
 	return err;
 }
 
@@ -5754,7 +5754,7 @@ static int ntfs_vnop_rename(struct vnop_rename_args *a)
 	 * with EINVAL error.
 	 */
 	if (src_dir_ni == dst_dir_ni)
-		lck_rw_lock_exclusive(&src_dir_ni->lock);
+		sx_xlock(&src_dir_ni->lock);
 	else {
 		BOOL is_parent;
 
@@ -5793,11 +5793,11 @@ static int ntfs_vnop_rename(struct vnop_rename_args *a)
 		 * @src_dir_ni.
 		 */
 		if (is_parent) {
-			lck_rw_lock_exclusive(&src_dir_ni->lock);
-			lck_rw_lock_exclusive(&dst_dir_ni->lock);
+			sx_xlock(&src_dir_ni->lock);
+			sx_xlock(&dst_dir_ni->lock);
 		} else {
-			lck_rw_lock_exclusive(&dst_dir_ni->lock);
-			lck_rw_lock_exclusive(&src_dir_ni->lock);
+			sx_xlock(&dst_dir_ni->lock);
+			sx_xlock(&src_dir_ni->lock);
 		}
 	}
 	/*
@@ -5830,7 +5830,7 @@ static int ntfs_vnop_rename(struct vnop_rename_args *a)
 	 * in progress which requires us to hold an exclusive lock on it.
 	 */
 	if (dst_ni)
-		lck_rw_lock_exclusive(&dst_ni->lock);
+		sx_xlock(&dst_ni->lock);
 	/*
 	 * Because we have locked the parent inode of the source inode there is
 	 * no need to lock the source inode itself.  We are not going to unlink
@@ -5911,7 +5911,7 @@ static int ntfs_vnop_rename(struct vnop_rename_args *a)
 		 * now.
 		 */
 		cache_purge(dst_ni->vn);
-		lck_rw_unlock_exclusive(&dst_ni->lock);
+		sx_xunlock(&dst_ni->lock);
 		dst_ni = NULL;
 	}
 	/*
@@ -6181,7 +6181,7 @@ src_enoent:
 					"specified.", (int)dst_cn->cn_namelen,
 					dst_cn->cn_nameptr,
 					(unsigned long long)dst_ni->mft_no);
-			lck_rw_unlock_exclusive(&dst_ni->lock);
+			sx_xunlock(&dst_ni->lock);
 			dst_ni = NULL;
 		}
 	} else /* if (!err) */ {
@@ -6332,7 +6332,7 @@ src_enoent:
 		 * Release the lock on the destination inode and set it to NULL
 		 * so we assume it does not exist from now on.
 		 */
-		lck_rw_unlock_exclusive(&dst_ni->lock);
+		sx_xunlock(&dst_ni->lock);
 		dst_ni = NULL;
 	}
 	/*
@@ -6349,7 +6349,7 @@ src_enoent:
 	if (dst_ni)
 		panic("%s(): dst_ni\n", __FUNCTION__);
 	dst_ni = src_ni;
-	lck_rw_lock_exclusive(&src_ni->lock);
+	sx_xlock(&src_ni->lock);
 	/*
 	 * As the source inode is now locked for writing we can perform the
 	 * rename in two stages.  First we remove the source name and then we
@@ -6412,11 +6412,11 @@ done:
 err:
 	/* If the destination inode existed we locked it so unlock it now. */
 	if (dst_ni)
-		lck_rw_unlock_exclusive(&dst_ni->lock);
+		sx_xunlock(&dst_ni->lock);
 	/* Drop the source and destination parent directory inode locks. */
-	lck_rw_unlock_exclusive(&src_dir_ni->lock);
+	sx_xunlock(&src_dir_ni->lock);
 	if (src_dir_ni != dst_dir_ni) {
-		lck_rw_unlock_exclusive(&dst_dir_ni->lock);
+		sx_xunlock(&dst_dir_ni->lock);
 		mtx_unlock(&vol->rename_lock);
 	}
 	ntfs_debug("Done (error %d).", (int)err);
@@ -6626,7 +6626,7 @@ retry:
 		/* Remove the inode from the name cache. */
 		cache_purge(ni->vn);
 		/* Release the vnode and try the create again. */
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		vnode_put(ni->vn);
 		goto retry;
 	}
@@ -6682,7 +6682,7 @@ retry:
 	lck_spin_unlock(&ni->size_lock);
 	if (NInoNonResident(raw_ni))
 		NInoSetNonResident(ni);
-	lck_rw_unlock_exclusive(&raw_ni->lock);
+	sx_xunlock(&raw_ni->lock);
 	vnode_put(raw_ni->vn);
 	/* Check for write errors. */
 	if (uio_resid(uio) && !err)
@@ -6690,7 +6690,7 @@ retry:
 	/* We no longer need the uio. */
 	uio_free(uio);
 	if (!err) {
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		ntfs_debug("Done.");
 		return 0;
 	}
@@ -6698,7 +6698,7 @@ retry:
 	ntfs_error(dir_ni->vol->mp, "Failed to write target path to symbolic "
 			"link inode (error %d).", err);
 err:
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&ni->lock);
 	err2 = ntfs_unlink(dir_ni, ni, a->a_cnp, 0, FALSE);
 	if (err2) {
 		ntfs_error(dir_ni->vol->mp, "Failed to unlink symbolic link "
@@ -6788,12 +6788,12 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 				"flags are supported yet, sorry.");
 		return ENOTSUP;
 	}
-	lck_rw_lock_shared(&dir_ni->lock);
+	sx_slock(&dir_ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(dir_ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(dir_ni->vn);
-		lck_rw_unlock_shared(&dir_ni->lock);
+		sx_sunlock(&dir_ni->lock);
 		ntfs_debug("Directory is deleted.");
 		return ENOENT;
 	}
@@ -6810,7 +6810,7 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 		dir_ni->last_access_time = ntfs_utc_current_time();
 		NInoSetDirtyTimes(dir_ni);
 	}
-	lck_rw_unlock_shared(&dir_ni->lock);
+	sx_sunlock(&dir_ni->lock);
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
 }
@@ -6890,7 +6890,7 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	 * Protect against changes in initialized_size and thus against
 	 * truncation also and against deletion/rename.
 	 */
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (!ni->link_count || NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -6953,7 +6953,7 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	lck_spin_unlock(&raw_ni->size_lock);
 	/* Perform the actual read of the symbolic link data into the uio. */
 	err = ntfs_read(raw_ni, uio, 0, TRUE);
-	lck_rw_unlock_shared(&raw_ni->lock);
+	sx_sunlock(&raw_ni->lock);
 	vnode_put(raw_ni->vn);
 	/*
 	 * If the read was partial, reset @uio pretending that the read never
@@ -6979,7 +6979,7 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	}
 	ntfs_debug("Done (error %d).", (int)err);
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	return err;
 }
 
@@ -7226,9 +7226,9 @@ static int ntfs_vnop_inactive(struct vnop_inactive_args *args)
 	 */
 	if (ni != base_ni && ni->type == AT_INDEX_ALLOCATION &&
 			ni->nr_dirhints) {
-		lck_rw_lock_exclusive(&ni->lock);
+		sx_xlock(&ni->lock);
 		ntfs_dirhints_put(ni, 0);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	}
 	/*
 	 * If the inode is not being deleted or this is a raw inode sync it and
@@ -7261,15 +7261,15 @@ sync:
 		return err;
 	}
 	if (ni != base_ni)
-		lck_rw_lock_exclusive(&base_ni->lock);
-	lck_rw_lock_exclusive(&ni->lock);
+		sx_xlock(&base_ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(vn);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		if (ni != base_ni)
-			lck_rw_unlock_exclusive(&base_ni->lock);
+			sx_xunlock(&base_ni->lock);
 		ntfs_debug("Done (was already deleted).");
 		return 0;
 	}
@@ -7278,9 +7278,9 @@ sync:
 	 * the inode lock sync the inode instead of deleting it.
 	 */
 	if (ni->link_count) {
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		if (ni != base_ni)
-			lck_rw_unlock_exclusive(&base_ni->lock);
+			sx_xunlock(&base_ni->lock);
 		ntfs_debug("Someone re-instantiated the inode.");
 		goto sync;
 	}
@@ -7320,7 +7320,7 @@ sync:
 	 * lock.  Anyone waiting on the lock should test for NInoDeleted() and
 	 * abort once they have taken the lock.
 	 */
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&ni->lock);
 	/* In case someone is waiting on the inode do a wakeup. */
 	ntfs_inode_wakeup(ni);
 	/* Invalidate all buffers to do with the vnode. */
@@ -7425,7 +7425,7 @@ put_err:
 unm_err:
 		ntfs_mft_record_unmap(base_ni);
 err:
-		lck_rw_unlock_exclusive(&base_ni->lock);
+		sx_xunlock(&base_ni->lock);
 		return err;
 	}
 	/*
@@ -7590,7 +7590,7 @@ do_next:
 				"record(s).  Run chkdsk to recover the lost "
 				"mft record(s).", err);
 	else {
-		lck_rw_lock_shared(&mftbmp_ni->lock);
+		sx_slock(&mftbmp_ni->lock);
 		while (nr_mrefs > 0) {
 			nr_mrefs--;
 			err = ntfs_bitmap_clear_bit(mftbmp_ni,
@@ -7617,7 +7617,7 @@ do_next:
 				NVolSetErrors(vol);
 			}
 		}
-		lck_rw_unlock_shared(&mftbmp_ni->lock);
+		sx_sunlock(&mftbmp_ni->lock);
 		(void)vnode_put(mftbmp_ni->vn);
 	}
 	sx_xunlock(&vol->mftbmp_lock);
@@ -7689,7 +7689,7 @@ static int ntfs_vnop_pathconf(struct vnop_pathconf_args *a)
 
 	ntfs_debug("Entering for pathconf variable number %d.", a->a_name);
 	if (ni) {
-		lck_rw_lock_shared(&ni->lock);
+		sx_slock(&ni->lock);
 		/*
 		 * Do not allow messing with the inode once it has been
 		 * deleted.
@@ -7697,7 +7697,7 @@ static int ntfs_vnop_pathconf(struct vnop_pathconf_args *a)
 		if (NInoDeleted(ni)) {
 			/* Remove the inode from the name cache. */
 			cache_purge(ni->vn);
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 			ntfs_debug("Directory is deleted.");
 			return ENOENT;
 		}
@@ -7793,7 +7793,7 @@ static int ntfs_vnop_pathconf(struct vnop_pathconf_args *a)
 		err = EINVAL;
 	}
 	if (ni)
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
 }
@@ -8475,7 +8475,7 @@ compressed:
 			if (err)
 				ntfs_error(vol->mp, "ntfs_write_compressed() "
 						"failed (error %d).", err);
-			lck_rw_unlock_exclusive(&raw_ni->lock);
+			sx_xunlock(&raw_ni->lock);
 			(void)vnode_put(raw_ni->vn);
 		}
 #endif
@@ -8577,9 +8577,9 @@ done:
 	}
 	if (locked) {
 		if (lock_type == LCK_RW_TYPE_SHARED)
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		else
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 	}
 	return err;
 }
@@ -8672,7 +8672,7 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 			"offset 0x%llx, size 0x%llx, options 0x%x.",
 			(unsigned long long)ni->mft_no, name, start_ofs,
 			start_count, a->a_options);
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -8722,11 +8722,11 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 		FINDER_INFO fi;
 
 		if (!NInoValidFinderInfo(ni)) {
-			if (!lck_rw_lock_shared_to_exclusive(&ni->lock)) {
-				lck_rw_lock_exclusive(&ni->lock);
+			if (!sx_try_upgrade(&ni->lock)) {
+				sx_xlock(&ni->lock);
 				if (NInoDeleted(ni)) {
 					cache_purge(ni->vn);
-					lck_rw_unlock_exclusive(&ni->lock);
+					sx_xunlock(&ni->lock);
 					ntfs_debug("Mft_no 0x%llx is deleted.",
 							(unsigned long long)
 							ni->mft_no);
@@ -8744,10 +8744,10 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 						"for mft_no 0x%llx (error %d).",
 						(unsigned long long)ni->mft_no,
 						err);
-				lck_rw_unlock_exclusive(&ni->lock);
+				sx_xunlock(&ni->lock);
 				return err;
 			}
-			lck_rw_lock_exclusive_to_shared(&ni->lock);
+			sx_downgrade(&ni->lock);
 			if (!NInoValidFinderInfo(ni))
 				panic("%s(): !NInoValidFinderInfo(ni)\n",
 						__FUNCTION__);
@@ -8912,10 +8912,10 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 			uio_setresid(uio, start_count);
 		}
 	}
-	lck_rw_unlock_shared(&ani->lock);
+	sx_sunlock(&ani->lock);
 	(void)vnode_put(ani->vn);
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	ntfs_debug("Done (error %d).", err);
 	return err;
 }
@@ -9009,7 +9009,7 @@ static int ntfs_vnop_setxattr(struct vnop_setxattr_args *a)
 	 * Access to extended attributes must be atomic which we ensure by
 	 * locking the base ntfs inode for writing.
 	 */
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -9394,10 +9394,10 @@ rm_err:
 			}
 		}
 	}
-	lck_rw_unlock_exclusive(&ani->lock);
+	sx_xunlock(&ani->lock);
 	(void)vnode_put(ani->vn);
 err:
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&ni->lock);
 	ntfs_debug("Done (error %d).", err);
 	return err;
 }
@@ -9452,7 +9452,7 @@ static int ntfs_vnop_removexattr(struct vnop_removexattr_args *a)
 	 * Access to extended attributes must be atomic which we ensure by
 	 * locking the base ntfs inode for writing.
 	 */
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -9666,10 +9666,10 @@ static int ntfs_vnop_removexattr(struct vnop_removexattr_args *a)
 		}
 	}
 	ntfs_debug("Done.");
-	lck_rw_unlock_exclusive(&ani->lock);
+	sx_xunlock(&ani->lock);
 	(void)vnode_put(ani->vn);
 err:
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&ni->lock);
 	return err;
 }
 
@@ -9731,7 +9731,7 @@ static int ntfs_vnop_listxattr(struct vnop_listxattr_args *args)
 	upcase_len = vol->upcase_len;
 	case_sensitive = NVolCaseSensitive(vol);
 	ntfs_debug("Entering.");
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -9774,11 +9774,11 @@ static int ntfs_vnop_listxattr(struct vnop_listxattr_args *args)
 	 * if so.
 	 */
 	if (!NInoValidFinderInfo(ni)) {
-		if (!lck_rw_lock_shared_to_exclusive(&ni->lock)) {
-			lck_rw_lock_exclusive(&ni->lock);
+		if (!sx_try_upgrade(&ni->lock)) {
+			sx_xlock(&ni->lock);
 			if (NInoDeleted(ni)) {
 				cache_purge(ni->vn);
-				lck_rw_unlock_exclusive(&ni->lock);
+				sx_xunlock(&ni->lock);
 				ntfs_debug("Mft_no 0x%llx is deleted.",
 						(unsigned long long)ni->mft_no);
 				return ENOENT;
@@ -9793,12 +9793,12 @@ static int ntfs_vnop_listxattr(struct vnop_listxattr_args *args)
 			ntfs_error(vol->mp, "Failed to obtain AfpInfo for "
 					"mft_no 0x%llx (error %d).",
 					(unsigned long long)ni->mft_no, err);
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 			return err;
 		}
 		if (!NInoValidFinderInfo(ni))
 			panic("%s(): !NInoValidFinderInfo(ni)\n", __FUNCTION__);
-		lck_rw_lock_exclusive_to_shared(&ni->lock);
+		sx_downgrade(&ni->lock);
 	}
 	/*
 	 * Make a copy of the Finder info and mask out the hidden bit if this
@@ -10035,7 +10035,7 @@ put_err:
 unm_err:
 	ntfs_mft_record_unmap(ni);
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	return err;
 }
 
@@ -10359,14 +10359,14 @@ eof:
 	 * Convert the vcn to the corresponding lcn and obtain the number of
 	 * contiguous clusters starting at the vcn.
 	 */
-	lck_rw_lock_shared(&ni->rl.lock);
+	sx_slock(&ni->rl.lock);
 	lcn = ntfs_attr_vcn_to_lcn_nolock(ni, vcn, FALSE,
 			a->a_run ? &clusters : 0);
 	if (lcn < LCN_HOLE) {
 		errno_t err;
 
 		/* Error: deal with it. */
-		lck_rw_unlock_shared(&ni->rl.lock);
+		sx_sunlock(&ni->rl.lock);
 		switch (lcn) {
 		case LCN_ENOENT:
 			/*
@@ -10423,7 +10423,7 @@ eof:
 					"very inefficient allocation and I/O "
 					"patterns.");
 		/* Return the hole. */
-		lck_rw_unlock_shared(&ni->rl.lock);
+		sx_sunlock(&ni->rl.lock);
 		*a->a_bpn = -1; /* -1 means hole. */
 		if (a->a_run) {
 			bytes = (clusters << vol->cluster_size_shift) - vcn_ofs;
@@ -10442,7 +10442,7 @@ eof:
 		}
 		goto done;
 	} else
-		lck_rw_unlock_shared(&ni->rl.lock);
+		sx_sunlock(&ni->rl.lock);
 	/* The vcn was mapped successfully to a physical lcn, return it. */
 	*a->a_bpn = ((lcn << vol->cluster_size_shift) + vcn_ofs) >>
 			vol->sector_size_shift;
@@ -10570,19 +10570,19 @@ static int ntfs_vnop_getnamedstream(struct vnop_getnamedstream_args *a)
 	 */
 	if (op == NS_OPEN) {
 		options = 0;
-		lck_rw_lock_exclusive(&ni->lock);
+		sx_xlock(&ni->lock);
 	} else {
 		options = XATTR_REPLACE;
-		lck_rw_lock_shared(&ni->lock);
+		sx_slock(&ni->lock);
 	}
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(vn);
 		if (op == NS_OPEN)
-			lck_rw_unlock_exclusive(&ni->lock);
+			sx_xunlock(&ni->lock);
 		else
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		ntfs_debug("Mft_no 0x%llx is deleted.",
 				(unsigned long long)ni->mft_no);
 		return ENOENT;
@@ -10593,7 +10593,7 @@ static int ntfs_vnop_getnamedstream(struct vnop_getnamedstream_args *a)
 	if (!err) {
 		/* We have successfully opened the named stream. */
 		*a->a_svpp = sni->vn;
-		lck_rw_unlock_shared(&sni->lock);
+		sx_sunlock(&sni->lock);
 		ntfs_debug("Done.");
 	} else {
 		if (err == ENOENT) {
@@ -10607,9 +10607,9 @@ static int ntfs_vnop_getnamedstream(struct vnop_getnamedstream_args *a)
 					(unsigned long long)ni->mft_no, err);
 	}
 	if (op == NS_OPEN)
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 	else
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	return err;
 }
 
@@ -10672,12 +10672,12 @@ static int ntfs_vnop_makenamedstream(struct vnop_makenamedstream_args *a)
 				(unsigned long long)ni->mft_no);
 		return EPERM;
 	}
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(vn);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		ntfs_debug("Mft_no 0x%llx is deleted.",
 				(unsigned long long)ni->mft_no);
 		return ENOENT;
@@ -10699,7 +10699,7 @@ static int ntfs_vnop_makenamedstream(struct vnop_makenamedstream_args *a)
 	if (!err) {
 		/* We have successfully opened the (created) named stream. */
 		*a->a_svpp = sni->vn;
-		lck_rw_unlock_shared(&sni->lock);
+		sx_sunlock(&sni->lock);
 		ntfs_debug("Done.");
 	} else {
 		if (err == EEXIST)
@@ -10712,7 +10712,7 @@ static int ntfs_vnop_makenamedstream(struct vnop_makenamedstream_args *a)
 					"%d).", name,
 					(unsigned long long)ni->mft_no, err);
 	}
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&ni->lock);
 	return err;
 }
 
@@ -10786,23 +10786,23 @@ static int ntfs_vnop_removenamedstream(struct vnop_removenamedstream_args *a)
 				(unsigned long long)ni->mft_no);
 		return EPERM;
 	}
-	lck_rw_lock_exclusive(&ni->lock);
+	sx_xlock(&ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(vn);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&ni->lock);
 		ntfs_debug("Mft_no 0x%llx is deleted.",
 				(unsigned long long)ni->mft_no);
 		return ENOATTR;
 	}
-	lck_rw_lock_exclusive(&sni->lock);
+	sx_xlock(&sni->lock);
 	/* Do not allow messing with the stream once it has been deleted. */
 	if (NInoDeleted(sni)) {
 		/* Remove the inode from the name cache. */
 		cache_purge(svn);
-		lck_rw_unlock_exclusive(&sni->lock);
-		lck_rw_unlock_exclusive(&ni->lock);
+		sx_xunlock(&sni->lock);
+		sx_xunlock(&ni->lock);
 		ntfs_debug("Stream mft_no 0x%llx, name %s is deleted.",
 				(unsigned long long)sni->mft_no, name);
 		return ENOATTR;
@@ -10853,8 +10853,8 @@ static int ntfs_vnop_removenamedstream(struct vnop_removenamedstream_args *a)
 		ntfs_debug("$DATA/%s attribute has already been unlinked from "
 				"mft_no 0x%llx.", name,
 				(unsigned long long)sni->mft_no);
-	lck_rw_unlock_exclusive(&sni->lock);
-	lck_rw_unlock_exclusive(&ni->lock);
+	sx_xunlock(&sni->lock);
+	sx_xunlock(&ni->lock);
 	return 0;
 }
 

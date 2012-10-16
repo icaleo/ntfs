@@ -130,7 +130,7 @@ errno_t ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		return err;
 	}
 	ia_vn = ia_ni->vn;
-	lck_rw_lock_shared(&ia_ni->lock);
+	sx_slock(&ia_ni->lock);
 	/* Get hold of the mft record for the directory. */
 	err = ntfs_mft_record_map(dir_ni, &m);
 	if (err) {
@@ -234,7 +234,7 @@ found_it:
 			*res_mref = le64_to_cpu(ie->indexed_file);
 			ntfs_attr_search_ctx_put(ctx);
 			ntfs_mft_record_unmap(dir_ni);
-			lck_rw_unlock_shared(&ia_ni->lock);
+			sx_sunlock(&ia_ni->lock);
 			(void)vnode_put(ia_vn);
 			return 0;
 		}
@@ -494,7 +494,7 @@ found_it2:
 			}
 			*res_mref = le64_to_cpu(ie->indexed_file);
 			ntfs_page_unmap(ia_ni, upl, pl, FALSE);
-			lck_rw_unlock_shared(&ia_ni->lock);
+			sx_sunlock(&ia_ni->lock);
 			(void)vnode_put(ia_vn);
 			return 0;
 		}
@@ -619,7 +619,7 @@ found_it2:
 	 */
 	ntfs_page_unmap(ia_ni, upl, pl, FALSE);
 not_found:
-	lck_rw_unlock_shared(&ia_ni->lock);
+	sx_sunlock(&ia_ni->lock);
 	(void)vnode_put(ia_vn);
 	if (name) {
 		*res_mref = name->mref;
@@ -640,7 +640,7 @@ unm_err:
 err:
 	if (name)
 		free(name, M_NTFS);
-	lck_rw_unlock_shared(&ia_ni->lock);
+	sx_sunlock(&ia_ni->lock);
 	(void)vnode_put(ia_vn);
 	if (!err)
 		err = EIO;
@@ -1231,7 +1231,7 @@ do_next:
 		goto err;
 	}
 	/* We need the lock exclusive because of the directory hints code. */
-	lck_rw_lock_exclusive(&ia_ni->lock);
+	sx_xlock(&ia_ni->lock);
 	ictx = ntfs_index_ctx_get(ia_ni);
 	if (!ictx) {
 		ntfs_error(vol->mp, "Not enough memory to allocate index "
@@ -1468,7 +1468,7 @@ dh_done:
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
 	if (ia_ni) {
-		lck_rw_unlock_exclusive(&ia_ni->lock);
+		sx_xunlock(&ia_ni->lock);
 		(void)vnode_put(ia_ni->vn);
 	}
 	ntfs_debug("%s (returned 0x%x entries, %s, now at offset 0x%llx).",
@@ -1525,7 +1525,7 @@ errno_t ntfs_dir_is_empty(ntfs_inode *dir_ni)
 				err);
 		return err;
 	}
-	lck_rw_lock_shared(&ia_ni->lock);
+	sx_slock(&ia_ni->lock);
 	/* Get the index bitmap inode if there is one. */
 	if (NInoIndexAllocPresent(ia_ni)) {
 		err = ntfs_attr_inode_get(dir_ni, AT_BITMAP, I30, 4, FALSE,
@@ -1761,10 +1761,10 @@ unm_done:
 	ntfs_page_unmap(bmp_ni, bmp_upl, bmp_pl, FALSE);
 done:
 	if (bmp_ni) {
-		lck_rw_unlock_shared(&bmp_ni->lock);
+		sx_sunlock(&bmp_ni->lock);
 		(void)vnode_put(bmp_ni->vn);
 	}
-	lck_rw_unlock_shared(&ia_ni->lock);
+	sx_sunlock(&ia_ni->lock);
 	(void)vnode_put(ia_ni->vn);
 	ntfs_debug("Done (directory is%s empty).", !err ? "" : " not");
 	return err;
@@ -1786,10 +1786,10 @@ unm_err:
 	ntfs_mft_record_unmap(dir_ni);
 err:
 	if (bmp_ni) {
-		lck_rw_unlock_shared(&bmp_ni->lock);
+		sx_sunlock(&bmp_ni->lock);
 		(void)vnode_put(bmp_ni->vn);
 	}
-	lck_rw_unlock_shared(&ia_ni->lock);
+	sx_sunlock(&ia_ni->lock);
 	(void)vnode_put(ia_ni->vn);
 	return err;
 vol_err:
@@ -1864,7 +1864,7 @@ errno_t ntfs_dir_entry_delete(ntfs_inode *dir_ni, ntfs_inode *ni,
 		return EIO;
 	}
 	/* Need exclusive access to the index throughout. */
-	lck_rw_lock_exclusive(&ia_ni->lock);
+	sx_xlock(&ia_ni->lock);
 	ictx = ntfs_index_ctx_get(ia_ni);
 	if (!ictx) {
 		ntfs_error(vol->mp, "Not enough memory to allocate index "
@@ -1944,7 +1944,7 @@ restart:
 		dir_ni->last_mft_change_time = dir_ni->last_data_change_time =
 				ntfs_utc_current_time();
 		NInoSetDirtyTimes(dir_ni);
-		lck_rw_unlock_exclusive(&ia_ni->lock);
+		sx_xunlock(&ia_ni->lock);
 		(void)vnode_put(ia_ni->vn);
 		ntfs_debug("Done.");
 		return 0;
@@ -2006,7 +2006,7 @@ restart:
 put_err:
 	ntfs_index_ctx_put(ictx);
 err:
-	lck_rw_unlock_exclusive(&ia_ni->lock);
+	sx_xunlock(&ia_ni->lock);
 	(void)vnode_put(ia_ni->vn);
 	ntfs_debug("Failed (error %d).", err);
 	return err;
@@ -2056,7 +2056,7 @@ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni, const FILENAME_ATTR *fn,
 		return err;
 	}
 	/* Need exclusive access to the index throughout. */
-	lck_rw_lock_exclusive(&ia_ni->lock);
+	sx_xlock(&ia_ni->lock);
 	ictx = ntfs_index_ctx_get(ia_ni);
 	if (!ictx) {
 		ntfs_error(dir_ni->vol->mp, "Not enough memory to allocate "
@@ -2093,7 +2093,7 @@ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni, const FILENAME_ATTR *fn,
 	err = ntfs_index_entry_add(ictx, fn, fn_len, &tmp_mref, 0);
 	ntfs_index_ctx_put(ictx);
 	if (!err) {
-		lck_rw_unlock_exclusive(&ia_ni->lock);
+		sx_xunlock(&ia_ni->lock);
 		(void)vnode_put(ia_ni->vn);
 		/* Update the mtime and ctime of the parent directory inode. */
 		dir_ni->last_mft_change_time = dir_ni->last_data_change_time =
@@ -2103,7 +2103,7 @@ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni, const FILENAME_ATTR *fn,
 		return 0;
 	}
 err:
-	lck_rw_unlock_exclusive(&ia_ni->lock);
+	sx_xunlock(&ia_ni->lock);
 	(void)vnode_put(ia_ni->vn);
 	return err;
 }

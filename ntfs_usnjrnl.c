@@ -76,7 +76,7 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 					"$UsnJrnl/$DATA/$Max.");
 			return err;
 		}
-		lck_rw_lock_shared(&max_ni->lock);
+		sx_slock(&max_ni->lock);
 		err = ntfs_page_map(max_ni, 0, &upl, &pl, (u8**)&uh, TRUE);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to read from "
@@ -98,7 +98,7 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 		uh->lowest_valid_usn = cpu_to_sle64(j_size);
 		uh->journal_id = stamp;
 		ntfs_page_unmap(max_ni, upl, pl, TRUE);
-		lck_rw_unlock_shared(&max_ni->lock);
+		sx_sunlock(&max_ni->lock);
 		(void)vnode_put(max_ni->vn);
 		/* Set the flag so we do not have to do it again on remount. */
 		NVolSetUsnJrnlStamped(vol);

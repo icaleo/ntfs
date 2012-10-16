@@ -74,7 +74,7 @@ struct _ntfs_inode {
 				   inodes and is incremented/decremented in the
 				   base inode for attribute/raw inode
 				   opens/closes, too. */
-	lck_rw_t lock;		/* Lock serializing changes to the inode such
+	struct sx lock;		/* Lock serializing changes to the inode such
 				   as inode truncation and directory content
 				   modification (both take the lock exclusive)
 				   and calls like readdir and file read (these

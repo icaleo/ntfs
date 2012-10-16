@@ -240,7 +240,7 @@ errno_t ntfs_attr_list_add(ntfs_inode *base_ni, MFT_RECORD *m,
 	ntfs_debug("Entering for mft_no 0x%llx%s.",
 			(unsigned long long)base_ni->mft_no,
 			for_mft ? ", for $MFT" : "");
-	lck_rw_lock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xlock(&base_ni->attr_list_rl.lock);
 	if (NInoAttrList(base_ni))
 		panic("%s(): NInoAttrList(base_ni)\n", __FUNCTION__);
 	if (!m)
@@ -263,7 +263,7 @@ errno_t ntfs_attr_list_add(ntfs_inode *base_ni, MFT_RECORD *m,
 	if (!al) {
 		ntfs_error(vol->mp, "Not enough memory to allocate buffer for "
 				"attribute list attribute.");
-		lck_rw_unlock_exclusive(&base_ni->attr_list_rl.lock);
+		sx_xunlock(&base_ni->attr_list_rl.lock);
 		return ENOMEM;
 	}
 	al_end = al + NTFS_ALLOC_BLOCK;
@@ -822,7 +822,7 @@ done:
 	base_ni->attr_list_size = al_size;
 	base_ni->attr_list_alloc = al_alloc;
 	NInoSetAttrList(base_ni);
-	lck_rw_unlock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xunlock(&base_ni->attr_list_rl.lock);
 	/*
 	 * Update @ctx if the attribute it describes is still in the base mft
 	 * record to reflect that the attribute list attribute was inserted in
@@ -1072,7 +1072,7 @@ delete_err:
 	/* Finally mark the fully restored base mft record dirty. */
 	NInoSetMrecNeedsDirtying(base_ni);
 free_err:
-	lck_rw_unlock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xunlock(&base_ni->attr_list_rl.lock);
 	free(al, M_NTFS);
 	return err;
 }
@@ -1184,7 +1184,7 @@ update_resident:
 	 * The attribute list attribute is non-resident, as we are shrinking it
 	 * we need to update the attribute sizes first.
 	 */
-	lck_rw_lock_exclusive(&ni->attr_list_rl.lock);
+	sx_xlock(&ni->attr_list_rl.lock);
 	/* Update the attribute sizes. */
 	if (ni->attr_list_size < sle64_to_cpu(a->initialized_size))
 		a->initialized_size = cpu_to_sle64(ni->attr_list_size);
@@ -1265,7 +1265,7 @@ update_non_resident:
 				(unsigned long long)ni->mft_no, err, es);
 		goto err;
 	}
-	lck_rw_unlock_exclusive(&ni->attr_list_rl.lock);
+	sx_xunlock(&ni->attr_list_rl.lock);
 done:
 	ntfs_debug("Done.");
 out:
@@ -1274,7 +1274,7 @@ out:
 		NInoSetMrecNeedsDirtying(ni);
 	return err;
 err:
-	lck_rw_unlock_exclusive(&ni->attr_list_rl.lock);
+	sx_xunlock(&ni->attr_list_rl.lock);
 	NVolSetErrors(vol);
 	err = EIO;
 	goto out;
@@ -1378,7 +1378,7 @@ errno_t ntfs_attr_list_sync_extend(ntfs_inode *base_ni, MFT_RECORD *base_m,
 	if (base_ni->attr_list_size == arec_size) {
 		if (!al_a->non_resident)
 			goto update_resident;
-		lck_rw_lock_exclusive(&base_ni->attr_list_rl.lock);
+		sx_xlock(&base_ni->attr_list_rl.lock);
 		goto update_non_resident;
 	}
 	mref = MK_LE_MREF(base_ni->mft_no, base_ni->seq_no);
@@ -1657,7 +1657,7 @@ make_non_resident:
 			~vol->cluster_size_mask;
 	if (!alloc_size)
 		panic("%s(): !alloc_size\n", __FUNCTION__);
-	lck_rw_lock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xlock(&base_ni->attr_list_rl.lock);
 	if (al_a->non_resident)
 		panic("%s(): al_a->non_resident\n", __FUNCTION__);
 	if (base_ni->attr_list_rl.rl)
@@ -1731,7 +1731,7 @@ make_non_resident:
 	goto write_non_resident;
 non_resident:
 	/* The attribute list attribute is non-resident. */
-	lck_rw_lock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xlock(&base_ni->attr_list_rl.lock);
 	if (!al_a->non_resident)
 		panic("%s(): !al_a->non_resident\n", __FUNCTION__);
 	/* Allocate more disk space if needed. */
@@ -2111,7 +2111,7 @@ update_non_resident:
 		al_a->initialized_size = al_a->data_size;
 	}
 unl_done:
-	lck_rw_unlock_exclusive(&base_ni->attr_list_rl.lock);
+	sx_xunlock(&base_ni->attr_list_rl.lock);
 done:
 	/* Make sure the modified base mft record is written out. */
 	if (dirty_mft)

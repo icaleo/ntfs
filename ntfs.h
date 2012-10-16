@@ -59,8 +59,8 @@ __private_extern__ OSMallocTag ntfs_malloc_tag;
 
 #include "ntfs_volume.h"
 
- /*
- * typedefs from OS X kernel_types.h
+/*
+ * BEGIN typedefs from OS X headers
  */
 typedef int errno_t;
 
@@ -73,6 +73,15 @@ typedef struct buf * buf_t;
 typedef struct uio * uio_t;
 
 typedef char * caddr_t;        /* address of a (signed) char */
+
+typedef unsigned int     lck_rw_type_t;
+ 
+#define LCK_RW_TYPE_SHARED                      0x01
+#define LCK_RW_TYPE_EXCLUSIVE           0x02
+
+/*
+ * END typedefs from OS X headers
+ */
 
 /* return a pointer to the RO vfs_statfs associated with mount_t */
 struct statfs * 

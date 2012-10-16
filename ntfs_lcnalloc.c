@@ -185,7 +185,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
-	lck_rw_lock_shared(&lcnbmp_ni->lock);
+	sx_slock(&lcnbmp_ni->lock);
 	/*
 	 * If no specific @start_lcn was requested, use the current data zone
 	 * position, otherwise use the requested @start_lcn but make sure it
@@ -811,7 +811,7 @@ out:
 				}
 			}
 		}
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		if (runlist->alloc)
@@ -848,7 +848,7 @@ out:
 	} else if (err == ENOSPC)
 		ntfs_debug("No space left at all, err ENOSPC, first free lcn "
 				"0x%llx.", (long long)vol->data1_zone_pos);
-	lck_rw_unlock_shared(&lcnbmp_ni->lock);
+	sx_sunlock(&lcnbmp_ni->lock);
 	(void)vnode_put(lcnbmp_ni->vn);
 	sx_xunlock(&vol->lcnbmp_lock);
 	return err;
@@ -1034,10 +1034,10 @@ errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol, ntfs_rl_element *rl,
 	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_vn);
 	if (!err) {
-		lck_rw_lock_shared(&lcnbmp_ni->lock);
+		sx_slock(&lcnbmp_ni->lock);
 		err = ntfs_cluster_free_from_rl_nolock(vol, rl, start_vcn,
 				count, nr_freed);
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
@@ -1372,10 +1372,10 @@ errno_t ntfs_cluster_free(ntfs_inode *ni, const VCN start_vcn, s64 count,
 	sx_xlock(&vol->lcnbmp_lock);
 	err = vnode_get(lcnbmp_vn);
 	if (!err) {
-		lck_rw_lock_shared(&lcnbmp_ni->lock);
+		sx_slock(&lcnbmp_ni->lock);
 		err = ntfs_cluster_free_nolock(ni, start_vcn, count, ctx,
 				nr_freed, FALSE);
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		return err;

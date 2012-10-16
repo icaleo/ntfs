@@ -102,7 +102,7 @@ typedef struct {
 	ntfs_rl_element *rl;
 	unsigned elements;
 	unsigned alloc;
-	lck_rw_t lock;
+	struct sx lock;
 } ntfs_runlist;
 
 #include "ntfs.h"
@@ -113,12 +113,12 @@ static inline void ntfs_rl_init(ntfs_runlist *rl)
 {
 	rl->rl = NULL;
 	rl->alloc = rl->elements = 0;
-	lck_rw_init(&rl->lock, ntfs_lock_grp, ntfs_lock_attr);
+	sx_init(&rl->lock, "ntfs runlist lock");
 }
 
 static inline void ntfs_rl_deinit(ntfs_runlist *rl)
 {
-	lck_rw_destroy(&rl->lock, ntfs_lock_grp);
+	sx_destroy(&rl->lock);
 }
 
 /**

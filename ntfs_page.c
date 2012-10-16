@@ -144,7 +144,7 @@ int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size, upl_t upl,
 		flags &= ~UPL_NESTED_PAGEOUT;
 	else {
 		locked = TRUE;
-		lck_rw_lock_shared(&ni->lock);
+		sx_slock(&ni->lock);
 	}
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
@@ -201,7 +201,7 @@ retry_pagein:
 			ntfs_error(ni->vol->mp, "Failed (cluster_pagein_ext(), "
 					"error %d).", err);
 		if (locked)
-			lck_rw_unlock_shared(&ni->lock);
+			sx_sunlock(&ni->lock);
 		return err;
 	}
 compressed:
@@ -283,7 +283,7 @@ compressed:
 				ntfs_error(ni->vol->mp,
 						"ntfs_read_compressed() "
 						"failed (error %d).", err);
-			lck_rw_unlock_shared(&raw_ni->lock);
+			sx_sunlock(&raw_ni->lock);
 			(void)vnode_put(raw_ni->vn);
 		}
 	}
@@ -325,7 +325,7 @@ err:
 		ntfs_error(ni->vol->mp, "Failed (error %d).", err);
 	}
 	if (locked)
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 	return err;
 }
 

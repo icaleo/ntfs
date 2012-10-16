@@ -113,7 +113,7 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 		return err;
 	}
 	if (!mft_is_locked)
-		lck_rw_lock_shared(&mft_ni->lock);
+		sx_slock(&mft_ni->lock);
 	/*
 	 * If the wanted mft record number is out of bounds the mft record does
 	 * not exist.
@@ -168,7 +168,7 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 	/* Catch multi sector transfer fixup errors. */
 	if (ntfs_is_mft_record(m->magic)) {
 		if (!mft_is_locked)
-			lck_rw_unlock_shared(&mft_ni->lock);
+			sx_sunlock(&mft_ni->lock);
 		ni->mft_ni = mft_ni;
 		ni->m_buf = buf;
 		ni->m = m;
@@ -194,7 +194,7 @@ err:
 	 * return value as it always is zero.
 	 */
 	if (!mft_is_locked)
-		lck_rw_unlock_shared(&mft_ni->lock);
+		sx_sunlock(&mft_ni->lock);
 	(void)vnode_put(mft_ni->vn);
 	return err;
 }
@@ -443,14 +443,14 @@ errno_t ntfs_mft_record_sync(ntfs_inode *ni)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 		return err;
 	}
-	lck_rw_lock_shared(&mft_ni->lock);
+	sx_slock(&mft_ni->lock);
 	/*
 	 * Get the buffer if it is cached.  If it is not cached then it cannot
 	 * be dirty either thus we do not need to write it.
 	 */
 	buf = buf_getblk(mft_ni->vn, ni->mft_no, vol->mft_record_size, 0, 0,
 			BLK_META | BLK_ONLYVALID);
-	lck_rw_unlock_shared(&mft_ni->lock);
+	sx_sunlock(&mft_ni->lock);
 	(void)vnode_put(mft_ni->vn);
 	if (!buf) {
 		ntfs_debug("Mft record 0x%llx is not in cache, nothing to do.",
@@ -517,7 +517,7 @@ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol, const s64 rec_no,
 	 * Protect against changes in initialized_size and thus against
 	 * truncation also.
 	 */
-	lck_rw_lock_shared(&mirr_ni->lock);
+	sx_slock(&mirr_ni->lock);
 	if (rec_no >= vol->mftmirr_size)
 		panic("%s(): rec_no >= vol->mftmirr_size\n", __FUNCTION__);
 	err = vnode_get(mirr_vn);
@@ -586,7 +586,7 @@ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol, const s64 rec_no,
 put:
 	(void)vnode_put(mirr_vn);
 err:
-	lck_rw_unlock_shared(&mirr_ni->lock);
+	sx_sunlock(&mirr_ni->lock);
 	if (!err)
 		ntfs_debug("Done.");
 	else {
@@ -813,7 +813,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	 * mft bitmap cannot be zero so we are ok to not check for it being
 	 * zero first.
 	 */
-	lck_rw_lock_exclusive(&mftbmp_ni->rl.lock);
+	sx_xlock(&mftbmp_ni->rl.lock);
 	lck_spin_lock(&mftbmp_ni->size_lock);
 	allocated_size = mftbmp_ni->allocated_size;
 	lck_spin_unlock(&mftbmp_ni->size_lock);
@@ -821,7 +821,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	err = ntfs_attr_find_vcn_nolock(mftbmp_ni, vcn, &rl, NULL);
 	if (err || !rl || !rl->length || rl->lcn < 0 || rl[1].length ||
 			rl[1].vcn != vcn + 1) {
-		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+		sx_xunlock(&mftbmp_ni->rl.lock);
 		ntfs_error(vol->mp, "Failed to determine last allocated "
 				"cluster of mft bitmap attribute.");
 		if (!err)
@@ -836,10 +836,10 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	if (err) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
 		sx_xunlock(&vol->lcnbmp_lock);
-		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+		sx_xunlock(&mftbmp_ni->rl.lock);
 		return err;
 	}
-	lck_rw_lock_shared(&lcnbmp_ni->lock);
+	sx_slock(&lcnbmp_ni->lock);
 	/*
 	 * Attempt to get the cluster following the last allocated cluster by
 	 * hand as it may be in the MFT zone so the allocator would not give it
@@ -849,10 +849,10 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	err = ntfs_page_map(lcnbmp_ni, ll & ~PAGE_MASK_64, &upl, &pl, &kaddr,
 			TRUE);
 	if (err) {
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
-		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+		sx_xunlock(&mftbmp_ni->rl.lock);
 		ntfs_error(vol->mp, "Failed to read from lcn bitmap.");
 		return err;
 	}
@@ -865,7 +865,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		if (vol->nr_free_clusters < 0)
 			vol->nr_free_clusters = 0;
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, TRUE);
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		/* Update the mft bitmap runlist. */
@@ -876,7 +876,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		ntfs_runlist runlist;
 
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, FALSE);
-		lck_rw_unlock_shared(&lcnbmp_ni->lock);
+		sx_sunlock(&lcnbmp_ni->lock);
 		(void)vnode_put(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		/* Allocate a cluster from the DATA_ZONE. */
@@ -885,7 +885,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		err = ntfs_cluster_alloc(vol, vcn + 1, 1, lcn, DATA_ZONE,
 				TRUE, &runlist);
 		if (err) {
-			lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+			sx_xunlock(&mftbmp_ni->rl.lock);
 			ntfs_error(vol->mp, "Failed to allocate a cluster for "
 					"the mft bitmap.");
 			if (err != ENOMEM && err != ENOSPC)
@@ -894,7 +894,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		}
 		err = ntfs_rl_merge(&mftbmp_ni->rl, &runlist);
 		if (err) {
-			lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+			sx_xunlock(&mftbmp_ni->rl.lock);
 			ntfs_error(vol->mp, "Failed to merge runlists for mft "
 					"bitmap.");
 			if (err != ENOMEM)
@@ -1014,7 +1014,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(mft_ni);
-	lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+	sx_xunlock(&mftbmp_ni->rl.lock);
 	ntfs_debug("Done.");
 	return 0;
 restore_undo_alloc:
@@ -1033,7 +1033,7 @@ restore_undo_alloc:
 		lck_spin_unlock(&mftbmp_ni->size_lock);
 		ntfs_attr_search_ctx_put(ctx);
 		ntfs_mft_record_unmap(mft_ni);
-		lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+		sx_xunlock(&mftbmp_ni->rl.lock);
 		/*
 		 * The only thing that is now wrong is the allocated size of the
 		 * base attribute extent which chkdsk should be able to fix.
@@ -1094,7 +1094,7 @@ undo_alloc:
 		ntfs_attr_search_ctx_put(ctx);
 	if (m)
 		ntfs_mft_record_unmap(mft_ni);
-	lck_rw_unlock_exclusive(&mftbmp_ni->rl.lock);
+	sx_xunlock(&mftbmp_ni->rl.lock);
 	return err;
 }
 
@@ -1278,7 +1278,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 	 * Determine the preferred allocation location, i.e. the last lcn of
 	 * the mft data attribute.
 	 */
-	lck_rw_lock_exclusive(&mft_ni->rl.lock);
+	sx_xlock(&mft_ni->rl.lock);
 	if (mft_ni->rl.elements > 1)
 		rl = &mft_ni->rl.rl[mft_ni->rl.elements - 2];
 	else
@@ -1287,7 +1287,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 			rl[1].vcn != vcn + 1) {
 		ntfs_error(vol->mp, "Failed to determine last allocated "
 				"cluster of mft data attribute.");
-		lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+		sx_xunlock(&mft_ni->rl.lock);
 		return EIO;
 	}
 	lcn = rl->lcn + rl->length;
@@ -1313,7 +1313,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 			ntfs_warning(vol->mp, "Cannot allocate mft record "
 					"because the maximum number of inodes "
 					"(2^32) has already been reached.");
-			lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+			sx_xunlock(&mft_ni->rl.lock);
 			return ENOSPC;
 		}
 	}
@@ -1340,7 +1340,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 			ntfs_error(vol->mp, "Failed to allocate the minimal "
 					"number of clusters (%lld) for the "
 					"mft data attribute.", (long long)nr);
-			lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+			sx_xunlock(&mft_ni->rl.lock);
 			return err;
 		}
 		/*
@@ -1358,7 +1358,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 	 */
 	err = ntfs_rl_merge(&mft_ni->rl, &runlist);
 	if (err) {
-		lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+		sx_xunlock(&mft_ni->rl.lock);
 		ntfs_error(vol->mp, "Failed to merge runlists for mft data "
 				"attribute.");
 		if (err != ENOMEM)
@@ -1383,7 +1383,7 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 	 * Again as explained above the mft cannot change under us so we leave
 	 * the runlist unlocked.
 	 */
-	lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+	sx_xunlock(&mft_ni->rl.lock);
 	/*
 	 * Update the attribute record as well.
 	 *
@@ -1561,12 +1561,12 @@ undo_alloc:
 	 * As before, we are going to update the runlist now so we need to take
 	 * the runlist lock for writing.
 	 */
-	lck_rw_lock_exclusive(&mft_ni->rl.lock);
+	sx_xlock(&mft_ni->rl.lock);
 	lck_spin_lock(&mft_ni->size_lock);
 	mft_ni->allocated_size -= nr << vol->cluster_size_shift;
 	lck_spin_unlock(&mft_ni->size_lock);
 	err2 = ntfs_rl_truncate_nolock(vol, &mft_ni->rl, vcn + 1);
-	lck_rw_unlock_exclusive(&mft_ni->rl.lock);
+	sx_xunlock(&mft_ni->rl.lock);
 	if (err2) {
 		ntfs_error(vol->mp, "Failed to truncate attribute runlist s "
 				"in error code path (error %d).%s", err2, es);
@@ -2088,7 +2088,7 @@ errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
 	}
 retry_mftbmp_alloc:
 	record_formatted = mark_sizes_dirty = dirty_buf = FALSE;
-	lck_rw_lock_exclusive(&mftbmp_ni->lock);
+	sx_xlock(&mftbmp_ni->lock);
 	err = ntfs_mft_bitmap_find_and_alloc_free_rec_nolock(vol,
 			va ? NULL : base_ni, &bit);
 	if (!err) {
@@ -2196,7 +2196,7 @@ found_free_rec:
 	}
 	ntfs_debug("Set bit 0x%llx in mft bitmap.", (unsigned long long)bit);
 have_alloc_rec:
-	lck_rw_unlock_exclusive(&mftbmp_ni->lock);
+	sx_xunlock(&mftbmp_ni->lock);
 	/*
 	 * The mft bitmap is now uptodate.  Deal with mft data attribute now.
 	 * Note, we keep hold of the mft bitmap lock for writing until all
@@ -2206,7 +2206,7 @@ have_alloc_rec:
 	 * parallel allocation could decide to allocate the same mft record as
 	 * this one.
 	 */
-	lck_rw_lock_shared(&mft_ni->lock);
+	sx_slock(&mft_ni->lock);
 	mft_ni_write_locked = FALSE;
 mft_relocked:
 	ll = (bit + 1) << vol->mft_record_size_shift;
@@ -2219,8 +2219,8 @@ mft_relocked:
 	}
 	if (!mft_ni_write_locked) {
 		mft_ni_write_locked = TRUE;
-		if (!lck_rw_lock_shared_to_exclusive(&mft_ni->lock)) {
-			lck_rw_lock_exclusive(&mft_ni->lock);
+		if (!sx_try_upgrade(&mft_ni->lock)) {
+			sx_xlock(&mft_ni->lock);
 			goto mft_relocked;
 		}
 	}
@@ -2244,7 +2244,7 @@ mft_relocked:
 		if (err) {
 			ntfs_error(vol->mp, "Failed to extend mft data "
 					"allocation.");
-			lck_rw_unlock_exclusive(&mft_ni->lock);
+			sx_xunlock(&mft_ni->lock);
 			goto undo_mftbmp_alloc_locked;
 		}
 		lck_spin_lock(&mft_ni->size_lock);
@@ -2391,7 +2391,7 @@ mft_relocked:
 		panic("%s(): mft_ni->initialized_size > mft_ni->data_size\n",
 				__FUNCTION__);
 	lck_spin_unlock(&mft_ni->size_lock);
-	lck_rw_lock_exclusive_to_shared(&mft_ni->lock);
+	sx_downgrade(&mft_ni->lock);
 mft_rec_already_initialized:
 	/*
 	 * Update the default mft allocation position.  We have to do this now
@@ -2474,7 +2474,7 @@ mft_rec_already_initialized:
 						"%d).",
 						(unsigned long long)bit, err);
 			buf_brelse(buf);
-			lck_rw_unlock_shared(&mft_ni->lock);
+			sx_sunlock(&mft_ni->lock);
 			sx_xlock(&vol->mftbmp_lock);
 			NVolSetErrors(vol);
 			goto retry_mftbmp_alloc;
@@ -2548,12 +2548,12 @@ mft_rec_already_initialized:
 					"chkdsk.", (unsigned long long)bit,
 					err);
 			NVolSetErrors(vol);
-			lck_rw_unlock_shared(&mft_ni->lock);
+			sx_sunlock(&mft_ni->lock);
 			goto free_undo_mftbmp_alloc;
 		}
 		err = ntfs_extent_mft_record_map_ext(base_ni, MK_MREF(bit,
 				le16_to_cpu(seq_no)), &ni, &m, TRUE);
-		lck_rw_unlock_shared(&mft_ni->lock);
+		sx_sunlock(&mft_ni->lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to map allocated mft "
 					"record 0x%llx (error %d).",
@@ -2877,14 +2877,14 @@ retry:
 					"chkdsk.", (unsigned long long)bit,
 					err);
 			NVolSetErrors(vol);
-			lck_rw_unlock_shared(&mft_ni->lock);
+			sx_sunlock(&mft_ni->lock);
 			ntfs_inode_unlock_alloc(ni);
 			(void)vnode_recycle(ni->vn);
 			(void)vnode_put(ni->vn);
 			goto free_undo_mftbmp_alloc;
 		}
 		err = ntfs_mft_record_map_ext(ni, &m, TRUE);
-		lck_rw_unlock_shared(&mft_ni->lock);
+		sx_sunlock(&mft_ni->lock);
 		if (err) {
 			ntfs_inode_unlock_alloc(ni);
 			(void)vnode_recycle(ni->vn);
@@ -2931,10 +2931,10 @@ undo_data_init:
 	lck_spin_lock(&mft_ni->size_lock);
 	mft_ni->data_size = old_data_size;
 	lck_spin_unlock(&mft_ni->size_lock);
-	lck_rw_unlock_exclusive(&mft_ni->lock);
+	sx_xunlock(&mft_ni->lock);
 	goto undo_mftbmp_alloc_locked;
 free_undo_mftbmp_alloc:
-	lck_rw_lock_shared(&mft_ni->lock);
+	sx_slock(&mft_ni->lock);
 	err2 = buf_meta_bread(mft_ni->vn, bit, vol->mft_record_size, NOCRED,
 			&buf);
 	if (err2) {
@@ -2971,7 +2971,7 @@ undo_mftbmp_alloc:
 					err2);
 	} else
 		buf_brelse(buf);
-	lck_rw_unlock_shared(&mft_ni->lock);
+	sx_sunlock(&mft_ni->lock);
 	sx_xlock(&vol->mftbmp_lock);
 	/*
 	 * We decremented the cached number of free mft records thus we need to
@@ -2986,7 +2986,7 @@ undo_mftbmp_alloc:
 	if (old_mft_data_pos < vol->mft_data_pos)
 		vol->mft_data_pos = old_mft_data_pos;
 undo_mftbmp_alloc_locked:
-	lck_rw_lock_shared(&mftbmp_ni->lock);
+	sx_slock(&mftbmp_ni->lock);
 	if (ntfs_bitmap_clear_bit(mftbmp_ni, bit)) {
 		ntfs_error(vol->mp, "Failed to clear bit in mft bitmap.%s", es);
 		NVolSetErrors(vol);
@@ -3000,7 +3000,7 @@ undo_mftbmp_alloc_locked:
 		if (vol->nr_free_mft_records < 0)
 			vol->nr_free_mft_records = 0;
 	}
-	lck_rw_unlock_shared(&mftbmp_ni->lock);
+	sx_sunlock(&mftbmp_ni->lock);
 err:
 	sx_xunlock(&vol->mftbmp_lock);
 	(void)vnode_put(mftbmp_ni->vn);
@@ -3012,7 +3012,7 @@ max_err:
 			"number of inodes (2^32) has already been reached.");
 	err = ENOSPC;
 unl_err:
-	lck_rw_unlock_exclusive(&mftbmp_ni->lock);
+	sx_xunlock(&mftbmp_ni->lock);
 	goto err;
 }
 
@@ -3127,9 +3127,9 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 	if (err)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$BITMAP.");
 	else {
-		lck_rw_lock_shared(&vol->mftbmp_ni->lock);
+		sx_slock(&vol->mftbmp_ni->lock);
 		err = ntfs_bitmap_clear_bit(vol->mftbmp_ni, mft_no);
-		lck_rw_unlock_shared(&vol->mftbmp_ni->lock);
+		sx_sunlock(&vol->mftbmp_ni->lock);
 		(void)vnode_put(vol->mftbmp_ni->vn);
 		if (!err) {
 			/*

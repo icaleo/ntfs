@@ -2189,7 +2189,7 @@ allocated_bit:
 	}
 	if (lock) {
 		ictx->bmp_is_locked = 0;
-		lck_rw_unlock_exclusive(&bmp_ni->lock);
+		sx_xunlock(&bmp_ni->lock);
 	}
 	(void)vnode_put(bmp_ni->vn);
 	/* Lay out an empty index block into the allocated space. */
@@ -2228,7 +2228,7 @@ alloc_err:
 put_err:
 	if (lock) {
 		ictx->bmp_is_locked = 0;
-		lck_rw_unlock_exclusive(&bmp_ni->lock);
+		sx_xunlock(&bmp_ni->lock);
 	}
 	(void)vnode_put(bmp_ni->vn);
 err:
@@ -2586,9 +2586,9 @@ update_and_retry_resize:
 		 */
 		if (actx->ni != base_ni) {
 move_idx_root:
-			lck_rw_lock_shared(&base_ni->attr_list_rl.lock);
+			sx_slock(&base_ni->attr_list_rl.lock);
 			err = ntfs_attr_record_move(actx);
-			lck_rw_unlock_shared(&base_ni->attr_list_rl.lock);
+			sx_sunlock(&base_ni->attr_list_rl.lock);
 			if (err) {
 				ntfs_error(vol->mp, "Failed to move index "
 						"root attribute from mft "
@@ -4502,7 +4502,7 @@ err:
 			break;
 		cur_ictx = cur_ictx->down;
 	} while (1);
-	lck_rw_unlock_shared(&bmp_ni->lock);
+	sx_sunlock(&bmp_ni->lock);
 	(void)vnode_put(bmp_ni->vn);
 err_out:
 	ntfs_error(idx_ni->vol->mp, "Failed (error %d).", err);
@@ -4855,7 +4855,7 @@ static errno_t ntfs_index_block_free(ntfs_index_context *ictx)
 	if (err) {
 		ntfs_error(vol->mp, "Failed to deallocate index block in "
 				"index bitmap (error %d).", err);
-		lck_rw_unlock_exclusive(&bmp_ni->lock);
+		sx_xunlock(&bmp_ni->lock);
 		(void)vnode_put(bmp_ni->vn);
 		return err;
 	}
@@ -4865,7 +4865,7 @@ done:
 		ntfs_debug("Done (index records are allocated beyond the "
 				"deallocated one).");
 out:
-		lck_rw_unlock_exclusive(&bmp_ni->lock);
+		sx_xunlock(&bmp_ni->lock);
 		(void)vnode_put(bmp_ni->vn);
 		return 0;
 	}
@@ -5168,7 +5168,7 @@ static errno_t ntfs_index_make_empty(ntfs_index_context *ictx)
 					"deleted or repopulated with "
 					"entries.");
 	}
-	lck_rw_unlock_exclusive(&bmp_ni->lock);
+	sx_xunlock(&bmp_ni->lock);
 	(void)vnode_put(bmp_ni->vn);
 	/*
 	 * We no longer have any index blocks allocated so invalidate our cache
@@ -5209,7 +5209,7 @@ err:
 			NVolSetErrors(idx_ni->vol);
 		}
 	} while ((ictx = ictx->up) != start_ictx);
-	lck_rw_unlock_exclusive(&bmp_ni->lock);
+	sx_xunlock(&bmp_ni->lock);
 	(void)vnode_put(bmp_ni->vn);
 	ntfs_error(idx_ni->vol->mp, "Failed (error %d).", err);
 	return err;

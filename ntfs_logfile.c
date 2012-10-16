@@ -537,7 +537,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 		ntfs_error(vol->mp, "Failed to get vnode for $LogFile.");
 		return err;
 	}
-	lck_rw_lock_shared(&ni->lock);
+	sx_slock(&ni->lock);
 	lck_spin_lock(&ni->size_lock);
 	size = ni->data_size;
 	lck_spin_unlock(&ni->size_lock);
@@ -565,7 +565,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 	if (size < log_page_size * 2 || (size - log_page_size * 2) >>
 			log_page_bits < NtfsMinLogRecordPages) {
 		ntfs_error(vol->mp, "$LogFile is too small.");
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);
 		return EINVAL;
 	}
@@ -669,7 +669,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 	}
 	if (upl)
 		ntfs_page_unmap(ni, upl, pl, FALSE);
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(ni->vn);
 	if (logfile_is_empty) {
 		NVolSetLogFileEmpty(vol);
@@ -711,7 +711,7 @@ is_empty:
 	ntfs_debug("Done.");
 	return 0;
 err:
-	lck_rw_unlock_shared(&ni->lock);
+	sx_sunlock(&ni->lock);
 	(void)vnode_put(ni->vn);
 	if (rstr1_ph)
 		free(rstr1_ph, M_NTFS);
@@ -802,12 +802,12 @@ errno_t ntfs_logfile_empty(ntfs_inode *ni)
 					"$LogFile.");
 			return err;
 		}
-		lck_rw_lock_shared(&ni->lock);
+		sx_slock(&ni->lock);
 		lck_spin_lock(&ni->size_lock);
 		data_size = ni->data_size;
 		lck_spin_unlock(&ni->size_lock);
 		err = ntfs_attr_set(ni, 0, data_size, 0xff);
-		lck_rw_unlock_shared(&ni->lock);
+		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to fill $LogFile with "
