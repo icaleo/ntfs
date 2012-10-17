@@ -45,12 +45,6 @@
 __private_extern__ const char ntfs_dev_email[];
 __private_extern__ const char ntfs_please_email[];
 
-/*
- * Lock group and lock attribute for de-/initialization of locks (defined
- * in ntfs_vfsops.c).
- */
-__private_extern__ lck_grp_t *ntfs_lock_grp;
-__private_extern__ lck_attr_t *ntfs_lock_attr;
 
 /*
  * A tag for allocation and freeing of memory (defined in ntfs_vfsops.c).

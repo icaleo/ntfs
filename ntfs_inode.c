@@ -157,10 +157,10 @@ static inline void __ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni)
 	ni->nr_dirhints = 0;
 	ni->dirhint_tag = 0;
 	TAILQ_INIT(&ni->dirhint_list);
-	lck_mtx_init(&ni->extent_lock, ntfs_lock_grp, ntfs_lock_attr);
+	mtx_init(&ni->extent_lock, "extent lock", NULL, MTX_DEF);
 	ni->nr_extents = 0;
 	ni->extent_alloc = 0;
-	lck_mtx_init(&ni->attr_nis_lock, ntfs_lock_grp, ntfs_lock_attr);
+	mtx_init(&ni->attr_nis_lock, "attr nis lock", NULL, MTX_DEF);
 	ni->nr_attr_nis = 0;
 	ni->attr_nis_alloc = 0;
 	ni->base_ni = NULL;
@@ -2702,9 +2702,9 @@ done:
 	 * we do not need to lock the new inode as we still have exclusive
 	 * access to it.
 	 */
-	lck_mtx_lock(&base_ni->attr_nis_lock);
+	mtx_lock(&base_ni->attr_nis_lock);
 	if (NInoDeleted(base_ni)) {
-		lck_mtx_unlock(&base_ni->attr_nis_lock);
+		mtx_unlock(&base_ni->attr_nis_lock);
 		return EDEADLK;
 	}
 	if ((base_ni->nr_attr_nis + 1) * sizeof(ntfs_inode *) >
@@ -2717,7 +2717,7 @@ done:
 		if (!tmp) {
 			ntfs_error(vol->mp, "Failed to allocated internal "
 					"buffer.");
-			lck_mtx_unlock(&base_ni->attr_nis_lock);
+			mtx_unlock(&base_ni->attr_nis_lock);
 			return ENOMEM;
 		}
 		if (base_ni->attr_nis_alloc) {
@@ -2734,7 +2734,7 @@ done:
 	ni->nr_extents = -1;
 	ni->base_ni = base_ni;
 	ni->base_attr_nis_lock = &base_ni->attr_nis_lock;
-	lck_mtx_unlock(&base_ni->attr_nis_lock);
+	mtx_unlock(&base_ni->attr_nis_lock);
 	ntfs_debug("Done.");
 	return 0;
 err:
@@ -3051,9 +3051,9 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 	 * we do not need to lock the new inode as we still have exclusive
 	 * access to it.
 	 */
-	lck_mtx_lock(&base_ni->attr_nis_lock);
+	mtx_lock(&base_ni->attr_nis_lock);
 	if (NInoDeleted(base_ni)) {
-		lck_mtx_unlock(&base_ni->attr_nis_lock);
+		mtx_unlock(&base_ni->attr_nis_lock);
 		return EDEADLK;
 	}
 	if ((base_ni->nr_attr_nis + 1) * sizeof(ntfs_inode *) >
@@ -3066,7 +3066,7 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 		if (!tmp) {
 			ntfs_error(vol->mp, "Failed to allocated internal "
 					"buffer.");
-			lck_mtx_unlock(&base_ni->attr_nis_lock);
+			mtx_unlock(&base_ni->attr_nis_lock);
 			return ENOMEM;
 		}
 		if (base_ni->attr_nis_alloc) {
@@ -3083,7 +3083,7 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 	ni->nr_extents = -1;
 	ni->base_ni = base_ni;
 	ni->base_attr_nis_lock = &base_ni->attr_nis_lock;
-	lck_mtx_unlock(&base_ni->attr_nis_lock);
+	mtx_unlock(&base_ni->attr_nis_lock);
 	ntfs_debug("Done.");
 	return 0;
 err:
@@ -3131,7 +3131,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 		int i;
 
 		/* Lock the base inode. */
-		lck_mtx_lock(ni->base_attr_nis_lock);
+		mtx_lock(ni->base_attr_nis_lock);
 		base_ni = ni->base_ni;
 		/* Find the current inode in the base inode array. */
 		attr_nis = base_ni->attr_nis;
@@ -3152,7 +3152,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 		}
 		ni->nr_extents = 0;
 		ni->base_ni = NULL;
-		lck_mtx_unlock(ni->base_attr_nis_lock);
+		mtx_unlock(ni->base_attr_nis_lock);
 		ni->base_attr_nis_lock = NULL;
 	}
 	if (ni->rl.alloc)
@@ -3184,7 +3184,8 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 	mtx_destroy(&ni->size_lock);
 	ntfs_rl_deinit(&ni->rl);
 	ntfs_rl_deinit(&ni->attr_list_rl);
-	lck_mtx_destroy(&ni->extent_lock, ntfs_lock_grp);
+	mtx_destroy(&ni->extent_lock);
+	mtx_destroy(&ni->attr_nis_lock);
 	free(ni, M_NTFS);
 	/* If the volume release was postponed, perform it now. */
 	if (do_release)
@@ -3226,7 +3227,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 	if (!NInoAttr(ni)) {
 		int count = 0;
 
-		lck_mtx_lock(&ni->attr_nis_lock);
+		mtx_lock(&ni->attr_nis_lock);
 		while (ni->nr_attr_nis > 0) {
 			ntfs_inode *attr_ni;
 			int err;
@@ -3235,7 +3236,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 			err = 1;
 			if (!NInoDeleted(attr_ni))
 				err = vnode_get(attr_ni->vn);
-			lck_mtx_unlock(&ni->attr_nis_lock);
+			mtx_unlock(&ni->attr_nis_lock);
 			if (!err) {
 				vnode_recycle(attr_ni->vn);
 				vnode_put(attr_ni->vn);
@@ -3254,9 +3255,9 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 						ni->mft_no);
 				count = 1001;
 			}
-			lck_mtx_lock(&ni->attr_nis_lock);
+			mtx_lock(&ni->attr_nis_lock);
 		}
-		lck_mtx_unlock(&ni->attr_nis_lock);
+		mtx_unlock(&ni->attr_nis_lock);
 	}
 	mtx_lock(&ntfs_inode_hash_lock);
 	NInoSetReclaim(ni);
@@ -4130,7 +4131,7 @@ errno_t ntfs_inode_sync(ntfs_inode *ni, const int ioflags,
 	if (NInoAttrList(base_ni)) {
 		int nr_extents;
 
-		lck_mtx_lock(&base_ni->extent_lock);
+		mtx_lock(&base_ni->extent_lock);
 		nr_extents = base_ni->nr_extents;
 		if (nr_extents > 0) {
 			ntfs_inode **extent_nis = base_ni->extent_nis;
@@ -4144,7 +4145,7 @@ errno_t ntfs_inode_sync(ntfs_inode *ni, const int ioflags,
 					err = err2;
 			}
 		}
-		lck_mtx_unlock(&base_ni->extent_lock);
+		mtx_unlock(&base_ni->extent_lock);
 	}
 	if (!err) {
 		ntfs_debug("Done.");

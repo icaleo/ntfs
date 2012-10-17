@@ -292,7 +292,7 @@ errno_t ntfs_extent_mft_record_map_ext(ntfs_inode *base_ni, MFT_REF mref,
 	 * in which case just return it.  If not found, add it to the base
 	 * inode before returning it.
 	 */
-	lck_mtx_lock(&base_ni->extent_lock);
+	mtx_lock(&base_ni->extent_lock);
 	if (base_ni->nr_extents > 0) {
 		extent_nis = base_ni->extent_nis;
 		for (i = 0; i < base_ni->nr_extents; i++) {
@@ -303,7 +303,7 @@ errno_t ntfs_extent_mft_record_map_ext(ntfs_inode *base_ni, MFT_REF mref,
 		}
 	}
 	if (ni) {
-		lck_mtx_unlock(&base_ni->extent_lock);
+		mtx_unlock(&base_ni->extent_lock);
 		/* We found the record.  Map and return it. */
 		err = ntfs_mft_record_map_ext(ni, &m, mft_is_locked);
 		if (!err) {
@@ -329,13 +329,13 @@ map_err_out:
 	/* Record was not there.  Get a new ntfs inode and initialize it. */
 	err = ntfs_extent_inode_get(base_ni, mref, &ni);
 	if (err) {
-		lck_mtx_unlock(&base_ni->extent_lock);
+		mtx_unlock(&base_ni->extent_lock);
 		return err;
 	}
 	/* Now map the extent mft record. */
 	err = ntfs_mft_record_map_ext(ni, &m, mft_is_locked);
 	if (err) {
-		lck_mtx_unlock(&base_ni->extent_lock);
+		mtx_unlock(&base_ni->extent_lock);
 		ntfs_inode_reclaim(ni);
 		goto map_err_out;
 	}
@@ -384,14 +384,14 @@ map_err_out:
 		base_ni->extent_nis = tmp;
 	}
 	base_ni->extent_nis[base_ni->nr_extents++] = ni;
-	lck_mtx_unlock(&base_ni->extent_lock);
+	mtx_unlock(&base_ni->extent_lock);
 	ntfs_debug("Done 2.");
 	*ext_ni = ni;
 	*ext_mrec = m;
 	return err;
 unm_err_out:
 	ntfs_mft_record_unmap(ni);
-	lck_mtx_unlock(&base_ni->extent_lock);
+	mtx_unlock(&base_ni->extent_lock);
 	/*
 	 * If the extent inode was not attached to the base inode we need to
 	 * release it or we will leak memory.
@@ -3058,7 +3058,7 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 		panic("%s(): ni->nr_extents != -1\n", __FUNCTION__);
 	if (base_ni->nr_extents <= 0)
 		panic("%s(): base_ni->nr_extents <= 0\n", __FUNCTION__);
-	lck_mtx_lock(&base_ni->extent_lock);
+	mtx_lock(&base_ni->extent_lock);
 	/* Dissociate the ntfs inode from the base inode. */
 	extent_nis = base_ni->extent_nis;
 	err = ENOENT;
@@ -3088,7 +3088,7 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 		err = 0;
 		break;
 	}
-	lck_mtx_unlock(&base_ni->extent_lock);
+	mtx_unlock(&base_ni->extent_lock);
 	if (err)
 		panic("%s(): Extent mft_no 0x%llx is not attached to "
 				"its base mft_no 0x%llx.\n", __FUNCTION__,

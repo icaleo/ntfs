@@ -229,14 +229,14 @@ struct _ntfs_inode {
 							   per cb. */
 		};
 	};
-	lck_mtx_t extent_lock;	/* Lock for accessing/modifying the below . */
+	struct mtx extent_lock;	/* Lock for accessing/modifying the below . */
 	s32 nr_extents;	/* For a base mft record, the number of attached extent
 			   inodes (0 if none), for extent records and for fake
 			   inodes describing an attribute this is -1 if the
 			   base inode at @base_ni is valid and 0 otherwise. */
 	u32 extent_alloc; /* Number of bytes allocated for the extent_nis
 			     array. */
-	lck_mtx_t attr_nis_lock; /* Lock for accessing/modifying the below. */
+	struct mtx attr_nis_lock; /* Lock for accessing/modifying the below. */
 	s32 nr_attr_nis;	/* For a base inode, the number of loaded
 				   attribute inodes (0 if none).  Ignored for
 				   attribut inodes and fake inodes. */
@@ -262,7 +262,7 @@ struct _ntfs_inode {
 						   record. For fake inodes, the
 						   real (base) inode to which
 						   the attribute belongs. */
-			lck_mtx_t *base_attr_nis_lock; /* Pointer to the base
+			struct mtx *base_attr_nis_lock; /* Pointer to the base
 							  inode
 							  attr_nis_lock or
 							  NULL. */
@@ -514,7 +514,7 @@ __private_extern__ errno_t ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni,
 				lck = NULL;			\
 	 		} while (NInoLocked(ni));		\
 		} else						\
-			lck_mtx_unlock(lock);			\
+			mtx_unlock(lock);			\
 	} while (0)
 
 /**
