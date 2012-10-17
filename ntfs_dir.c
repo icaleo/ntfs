@@ -1613,9 +1613,9 @@ errno_t ntfs_dir_is_empty(ntfs_inode *dir_ni)
 				(unsigned long long)dir_ni->mft_no);
 		goto dir_err;
 	}
-	lck_spin_lock(&bmp_ni->size_lock);
+	mtx_lock_spin(&bmp_ni->size_lock);
 	bmp_size = bmp_ni->data_size;
-	lck_spin_unlock(&bmp_ni->size_lock);
+	mtx_unlock_spin(&bmp_ni->size_lock);
 	ia_pos = bmp_pos = bmp_ofs = 0;
 	prev_ia_pos = -1;
 get_next_bmp_page:

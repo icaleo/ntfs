@@ -66,9 +66,9 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 		ntfs_inode *max_ni;
 		errno_t err;
 
-		lck_spin_lock(&vol->usnjrnl_j_ni->size_lock);
+		mtx_lock_spin(&vol->usnjrnl_j_ni->size_lock);
 		j_size = vol->usnjrnl_j_ni->data_size;
-		lck_spin_unlock(&vol->usnjrnl_j_ni->size_lock);
+		mtx_unlock_spin(&vol->usnjrnl_j_ni->size_lock);
 		max_ni = vol->usnjrnl_max_ni;
 		err = vnode_get(max_ni->vn);
 		if (err) {

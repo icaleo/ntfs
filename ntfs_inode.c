@@ -127,7 +127,7 @@ static inline void __ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni)
 	 */
 	ni->block_size = vol->sector_size;
 	ni->block_size_shift = vol->sector_size_shift;
-	lck_spin_init(&ni->size_lock, ntfs_lock_grp, ntfs_lock_attr);
+	mtx_init(&ni->size_lock, "ntfs err buf lock", NULL, MTX_SPIN);
 	ni->allocated_size = ni->data_size = ni->initialized_size = 0;
 	ni->seq_no = 0;
 	ni->link_count = 0;
@@ -621,11 +621,11 @@ retry:
 			 * lock the sizes for modification.  On the other hand
 			 * @ini is not private thus we need to lock its sizes.
 			 */
-			lck_spin_lock(&ini->size_lock);
+			mtx_lock_spin(&ini->size_lock);
 			ni->allocated_size = ini->allocated_size;
 			ni->data_size = ini->data_size;
 			ni->initialized_size = ini->initialized_size;
-			lck_spin_unlock(&ini->size_lock);
+			mtx_unlock_spin(&ini->size_lock);
 			/* We are done with the index vnode. */
 			(void)vnode_put(ini->vn);
 		}
@@ -934,9 +934,9 @@ exists:
 				if (vn)
 					size = ubc_getsize(vn);
 				else {
-					lck_spin_lock(&ni->size_lock);
+					mtx_lock_spin(&ni->size_lock);
 					size = ni->data_size;
-					lck_spin_unlock(&ni->size_lock);
+					mtx_unlock_spin(&ni->size_lock);
 				}
 				if (!size) {
 					if (options & XATTR_REPLACE) {
@@ -1404,9 +1404,9 @@ errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni)
 				(unsigned long long)ni->mft_no, err);
 		goto err;
 	}
-	lck_spin_lock(&afp_ni->size_lock);
+	mtx_lock_spin(&afp_ni->size_lock);
 	afp_size = afp_ni->data_size;
-	lck_spin_unlock(&afp_ni->size_lock);
+	mtx_unlock_spin(&afp_ni->size_lock);
 	if (afp_size > PAGE_SIZE)
 		afp_size = PAGE_SIZE;
 	ntfs_inode_afpinfo_cache(ni, afp, afp_size);
@@ -1610,9 +1610,9 @@ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni)
 		goto done;
 	}
 	update = TRUE;
-	lck_spin_lock(&afp_ni->size_lock);
+	mtx_lock_spin(&afp_ni->size_lock);
 	afp_size = afp_ni->data_size;
-	lck_spin_unlock(&afp_ni->size_lock);
+	mtx_unlock_spin(&afp_ni->size_lock);
 	if (afp_ni->data_size != sizeof(AFPINFO)) {
 		err = ntfs_attr_resize(afp_ni, sizeof(AFPINFO), 0, NULL);
 		if (err) {
@@ -1627,9 +1627,9 @@ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni)
 				"mft_no 0x%llx to sizeof(AFPINFO) (%ld) "
 				"bytes.", (unsigned long long)ni->mft_no,
 				sizeof(AFPINFO));
-		lck_spin_lock(&afp_ni->size_lock);
+		mtx_lock_spin(&afp_ni->size_lock);
 		afp_size = afp_ni->data_size;
-		lck_spin_unlock(&afp_ni->size_lock);
+		mtx_unlock_spin(&afp_ni->size_lock);
 		if (afp_size != sizeof(AFPINFO))
 			panic("%s(): afp_size != sizeof(AFPINFO)\n",
 					__FUNCTION__);
@@ -2378,7 +2378,7 @@ static errno_t ntfs_attr_inode_read_or_create(ntfs_inode *base_ni,
 			NInoSetEncrypted(ni);
 		if (NInoNonResident(base_ni))
 			NInoSetNonResident(ni);
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		if (NInoCompressed(base_ni) || NInoSparse(base_ni)) {
 			ni->compression_block_clusters =
 					base_ni->compression_block_clusters;
@@ -2408,7 +2408,7 @@ static errno_t ntfs_attr_inode_read_or_create(ntfs_inode *base_ni,
 					ni->allocated_size =
 					base_ni->allocated_size;
 		}
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 		if (NInoAttr(base_ni)) {
 			/* Set @base_ni to point to the real base inode. */
 			if (base_ni->nr_extents != -1)
@@ -3181,7 +3181,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
 	mtx_unlock(&vol->inodes_lock);
 	/* Destroy all the locks before finally discarding the ntfs inode. */
 	sx_destroy(&ni->lock);
-	lck_spin_destroy(&ni->size_lock, ntfs_lock_grp);
+	mtx_destroy(&ni->size_lock);
 	ntfs_rl_deinit(&ni->rl);
 	ntfs_rl_deinit(&ni->attr_list_rl);
 	lck_mtx_destroy(&ni->extent_lock, ntfs_lock_grp);
@@ -3595,12 +3595,12 @@ static errno_t ntfs_inode_sync_to_mft_record(ntfs_inode *ni)
 	}
 	/* We ensure above that this never triggers for directory inodes. */
 	if (dirty_sizes) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		allocated_size = cpu_to_sle64(NInoNonResident(ni) &&
 				(NInoSparse(ni) || NInoCompressed(ni)) ?
 				ni->compressed_size : ni->allocated_size);
 		data_size = cpu_to_sle64(ni->data_size);
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 	} else
 		allocated_size = data_size = 0;
 	/*

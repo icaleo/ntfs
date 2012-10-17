@@ -85,7 +85,7 @@ struct _ntfs_inode {
 				   this is the size of an mst protected ntfs
 				   record. */
 	u8 block_size_shift; 	/* Log2 of the above. */
-	lck_spin_t size_lock;	/* Lock serializing access to inode sizes. */
+	struct mtx size_lock;	/* Lock serializing access to inode sizes. */
 	s64 allocated_size;	/* Copy from the attribute record. */
 	s64 data_size;		/* Copy from the attribute record. */
 	s64 initialized_size;	/* Copy from the attribute record. */

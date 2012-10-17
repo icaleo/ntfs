@@ -1617,11 +1617,11 @@ retry:
 	a->highest_vcn = cpu_to_sle64((idx_ni->allocated_size >>
 			vol->cluster_size_shift) - 1);
 	a->mapping_pairs_offset = cpu_to_le16(mp_ofs);
-	lck_spin_lock(&idx_ni->size_lock);
+	mtx_lock_spin(&idx_ni->size_lock);
 	a->allocated_size = cpu_to_sle64(idx_ni->allocated_size);
 	a->data_size = cpu_to_sle64(idx_ni->data_size);
 	a->initialized_size = cpu_to_sle64(idx_ni->initialized_size);
-	lck_spin_unlock(&idx_ni->size_lock);
+	mtx_unlock_spin(&idx_ni->size_lock);
 	/* Copy the attribute name into place. */
 	if (idx_ni->name_len)
 		memcpy((u8*)a + offsetof(ATTR_RECORD, compressed_size),
@@ -2005,9 +2005,9 @@ static errno_t ntfs_index_block_alloc(ntfs_index_context *ictx, VCN *dst_vcn,
 	}
 	/* Find the first zero bit in the index bitmap. */
 	bmp_pos = 0;
-	lck_spin_lock(&bmp_ni->size_lock);
+	mtx_lock_spin(&bmp_ni->size_lock);
 	end_pos = bmp_ni->initialized_size;
-	lck_spin_unlock(&bmp_ni->size_lock);
+	mtx_unlock_spin(&bmp_ni->size_lock);
 	for (bmp_pos = 0; bmp_pos < end_pos;) {
 		err = ntfs_page_map(bmp_ni, bmp_pos, &upl, &pl, &bmp, TRUE);
 		if (err) {
@@ -2041,9 +2041,9 @@ static errno_t ntfs_index_block_alloc(ntfs_index_context *ictx, VCN *dst_vcn,
 	 * we extend it by 8 bytes and allocate the first bit of the extension.
 	 */
 	bmp_pos = end_pos;
-	lck_spin_lock(&bmp_ni->size_lock);
+	mtx_lock_spin(&bmp_ni->size_lock);
 	end_pos = bmp_ni->data_size;
-	lck_spin_unlock(&bmp_ni->size_lock);
+	mtx_unlock_spin(&bmp_ni->size_lock);
 	/* If we are exceeding the bitmap size need to extend it. */
 	have_resized = FALSE;
 	if (bmp_pos + 8 >= end_pos) {
@@ -2086,9 +2086,9 @@ static errno_t ntfs_index_block_alloc(ntfs_index_context *ictx, VCN *dst_vcn,
 	 */
 	if (NInoNonResident(bmp_ni)) {
 #ifdef DEBUG
-		lck_spin_lock(&bmp_ni->size_lock);
+		mtx_lock_spin(&bmp_ni->size_lock);
 		init_size = bmp_ni->initialized_size;
-		lck_spin_unlock(&bmp_ni->size_lock);
+		mtx_unlock_spin(&bmp_ni->size_lock);
 		ntfs_debug("Setting initialized size of index bitmap, old "
 				"size 0x%llx, requested size 0x%llx.",
 				(unsigned long long)init_size,
@@ -2135,9 +2135,9 @@ allocated_bit:
 	 *
 	 * If the allocated bit is outside the data size need to extend it.
 	 */
-	lck_spin_lock(&idx_ni->size_lock);
+	mtx_lock_spin(&idx_ni->size_lock);
 	end_pos = idx_ni->data_size;
-	lck_spin_unlock(&idx_ni->size_lock);
+	mtx_unlock_spin(&idx_ni->size_lock);
 	if (bmp_pos >= end_pos >> idx_ni->block_size_shift) {
 		ntfs_debug("Extending index allocation, old size 0x%llx, "
 				"requested size 0x%llx.", (unsigned long long)
@@ -2169,9 +2169,9 @@ allocated_bit:
 		goto alloc_err;
 	}
 	/* Extend the initialized size if needed. */
-	lck_spin_lock(&idx_ni->size_lock);
+	mtx_lock_spin(&idx_ni->size_lock);
 	init_size = idx_ni->initialized_size;
-	lck_spin_unlock(&idx_ni->size_lock);
+	mtx_unlock_spin(&idx_ni->size_lock);
 	if (bmp_pos >= init_size >> idx_ni->block_size_shift) {
 		ntfs_debug("Setting initialized size of index allocation, old "
 				"size 0x%llx, requested size 0x%llx.",
@@ -2815,18 +2815,18 @@ move_idx_root:
 		 * allocation attribute.
 		 */
 		NInoSetIndexAllocPresent(idx_ni);
-		lck_spin_lock(&idx_ni->size_lock);
+		mtx_lock_spin(&idx_ni->size_lock);
 		idx_ni->allocated_size = (s64)clusters <<
 				vol->cluster_size_shift;
 		idx_ni->initialized_size = idx_ni->data_size =
 				idx_ni->block_size;
-		lck_spin_unlock(&idx_ni->size_lock);
+		mtx_unlock_spin(&idx_ni->size_lock);
 		if (idx_ni->name == I30) {
-			lck_spin_lock(&base_ni->size_lock);
+			mtx_lock_spin(&base_ni->size_lock);
 			base_ni->allocated_size = idx_ni->allocated_size;
 			base_ni->initialized_size = base_ni->data_size =
 					idx_ni->block_size;
-			lck_spin_unlock(&base_ni->size_lock);
+			mtx_unlock_spin(&base_ni->size_lock);
 		}
 		if (!ubc_setsize(idx_ni->vn, idx_ni->data_size))
 			panic("%s(): ubc_setsize() failed.\n", __FUNCTION__);
@@ -3147,15 +3147,15 @@ bmp_err_err:
 	}
 ia_err:
 	/* Reset the inode. */
-	lck_spin_lock(&idx_ni->size_lock);
+	mtx_lock_spin(&idx_ni->size_lock);
 	idx_ni->initialized_size = idx_ni->data_size = idx_ni->allocated_size =
 			0;
-	lck_spin_unlock(&idx_ni->size_lock);
+	mtx_unlock_spin(&idx_ni->size_lock);
 	if (idx_ni->name == I30) {
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		base_ni->initialized_size = base_ni->data_size =
 				base_ni->allocated_size = 0;
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 	}
 	NInoClearIndexAllocPresent(idx_ni);
 	/*
@@ -4882,9 +4882,9 @@ out:
 	if (idx_ni->last_set_bit >= 0)
 		bmp_pos = idx_ni->last_set_bit >> 3;
 	else {
-		lck_spin_lock(&bmp_ni->size_lock);
+		mtx_lock_spin(&bmp_ni->size_lock);
 		bmp_pos = bmp_ni->initialized_size - 1;
-		lck_spin_unlock(&bmp_ni->size_lock);
+		mtx_unlock_spin(&bmp_ni->size_lock);
 	}
 	do {
 		upl_t upl;
@@ -4965,9 +4965,9 @@ was_last_set_bit:
 	target_pos = (((idx_ni->last_set_bit + 1) <<
 			idx_ni->block_size_shift) + vol->cluster_size_mask) &
 			~(s64)vol->cluster_size_mask;
-	lck_spin_lock(&idx_ni->size_lock);
+	mtx_lock_spin(&idx_ni->size_lock);
 	alloc_size = idx_ni->allocated_size;
-	lck_spin_unlock(&idx_ni->size_lock);
+	mtx_unlock_spin(&idx_ni->size_lock);
 	if (target_pos >= alloc_size) {
 		ntfs_debug("Done (no space would be freed on disk by "
 				"truncating the index allocation attribute).");
@@ -4993,9 +4993,9 @@ was_last_set_bit:
 		target_pos = ((((target_pos >> idx_ni->block_size_shift) +
 				7) >> 3) + vol->cluster_size_mask) &
 				~(s64)vol->cluster_size_mask;
-		lck_spin_lock(&bmp_ni->size_lock);
+		mtx_lock_spin(&bmp_ni->size_lock);
 		alloc_size = bmp_ni->allocated_size;
-		lck_spin_unlock(&bmp_ni->size_lock);
+		mtx_unlock_spin(&bmp_ni->size_lock);
 		if (target_pos >= alloc_size) {
 			ntfs_debug("Done (truncated index allocation to free "
 					"space on disk but not truncating "
@@ -5073,9 +5073,9 @@ static errno_t ntfs_index_make_empty(ntfs_index_context *ictx)
 				"(error %d).", err);
 		return err;
 	}
-	lck_spin_lock(&bmp_ni->size_lock);
+	mtx_lock_spin(&bmp_ni->size_lock);
 	data_size = bmp_ni->data_size;
-	lck_spin_unlock(&bmp_ni->size_lock);
+	mtx_unlock_spin(&bmp_ni->size_lock);
 	err = ntfs_attr_set(bmp_ni, 0, data_size, 0);
 	if (err) {
 		ntfs_error(idx_ni->vol->mp, "Failed to deallocate index "

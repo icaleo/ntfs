@@ -258,12 +258,12 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 	/* Loop until all clusters are allocated, i.e. clusters == 0. */
 	clusters = count;
 	rlpos = rlsize = 0;
-	lck_spin_lock(&lcnbmp_ni->size_lock);
+	mtx_lock_spin(&lcnbmp_ni->size_lock);
 	data_size = ubc_getsize(lcnbmp_ni->vn);
 	if (data_size != lcnbmp_ni->data_size)
 		panic("%s(): data_size != lcnbmp_ni->data_size\n",
 				__FUNCTION__);
-	lck_spin_unlock(&lcnbmp_ni->size_lock);
+	mtx_unlock_spin(&lcnbmp_ni->size_lock);
 	while (1) {
 		ntfs_debug("Start of outer while loop: done_zones 0x%x, "
 				"search_zone %d, pass %d, zone_start 0x%llx, "

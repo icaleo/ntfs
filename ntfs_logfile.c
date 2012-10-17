@@ -538,9 +538,9 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 		return err;
 	}
 	sx_slock(&ni->lock);
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/* Make sure the file does not exceed the maximum allowed size. */
 	if (size > (s64)NtfsMaxLogFileSize)
 		size = NtfsMaxLogFileSize;
@@ -803,9 +803,9 @@ errno_t ntfs_logfile_empty(ntfs_inode *ni)
 			return err;
 		}
 		sx_slock(&ni->lock);
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		data_size = ni->data_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		err = ntfs_attr_set(ni, 0, data_size, 0xff);
 		sx_sunlock(&ni->lock);
 		(void)vnode_put(ni->vn);

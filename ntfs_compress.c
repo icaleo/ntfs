@@ -625,7 +625,7 @@ errno_t ntfs_read_compressed(ntfs_inode *ni, ntfs_inode *raw_ni, s64 ofs_start,
 	 * to have a partial uninitialized page which makes the decompression
 	 * code simpler.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	init_size = ni->initialized_size;
 	raw_size = ni->allocated_size;
 	if (ofs > ni->data_size)
@@ -633,7 +633,7 @@ errno_t ntfs_read_compressed(ntfs_inode *ni, ntfs_inode *raw_ni, s64 ofs_start,
 				"data size 0x%llx.\n", __FUNCTION__,
 				(unsigned long long)ofs,
 				(unsigned long long)ni->data_size);
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	size = (init_size + PAGE_MASK) & ~PAGE_MASK_64;
 	/* @ofs is page aligned and @count is at least one page in size. */
 	if (ofs + count > init_size) {

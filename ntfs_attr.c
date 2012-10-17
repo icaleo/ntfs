@@ -251,10 +251,10 @@ errno_t ntfs_map_runlist_nolock(ntfs_inode *ni, VCN vcn,
 			panic("%s(): !a->non_resident\n", __FUNCTION__);
 		ctx_is_temporary = FALSE;
 		end_vcn = sle64_to_cpu(a->highest_vcn);
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		allocated_size_vcn = ni->allocated_size >>
 				ni->vol->cluster_size_shift;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		/*
 		 * If we already have the attribute extent containing @vcn in
 		 * @ctx, no need to look it up again.  We slightly cheat in
@@ -440,13 +440,13 @@ LCN ntfs_attr_vcn_to_lcn_nolock(ntfs_inode *ni, const VCN vcn,
 		panic("%s(): vcn < 0\n", __FUNCTION__);
 retry_remap:
 	if (!ni->rl.elements) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		if (!ni->allocated_size) {
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			lcn = LCN_ENOENT;
 			goto lcn_enoent;
 		}
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (!is_retry)
 			goto try_to_map;
 		lcn = LCN_EIO;
@@ -584,12 +584,12 @@ errno_t ntfs_attr_find_vcn_nolock(ntfs_inode *ni, const VCN vcn,
 		panic("%s(): vcn < 0\n", __FUNCTION__);
 retry_remap:
 	if (!ni->rl.elements) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		if (!ni->allocated_size) {
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			return LCN_ENOENT;
 		}
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (!is_retry)
 			goto try_to_map;
 		err = EIO;
@@ -2220,13 +2220,13 @@ sparse_done:
 	 * compressed sizes is sufficient in which case we can save a few CPU
 	 * cycles by not updating the data and initialized sizes here.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	a->allocated_size = cpu_to_sle64(ni->allocated_size);
 	a->data_size = cpu_to_sle64(ni->data_size);
 	a->initialized_size = cpu_to_sle64(ni->initialized_size);
 	if (a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE))
 		a->compressed_size = cpu_to_sle64(ni->compressed_size);
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If the current mapping pairs array is valid and the first vcn at
 	 * which we need to update the mapping pairs array is not in this
@@ -2957,9 +2957,9 @@ errno_t ntfs_attr_make_non_resident(ntfs_inode *ni)
 	 * The size needs to be aligned to a cluster boundary for allocation
 	 * purposes.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	new_size = (data_size + vol->cluster_size_mask) &
 			~vol->cluster_size_mask;
 	sx_xlock(&ni->rl.lock);
@@ -3432,7 +3432,7 @@ do_switch:
 	if (err)
 		panic("%s(): err\n", __FUNCTION__);
 	/* Setup the in-memory attribute structure to be non-resident. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->allocated_size = new_size;
 	if (NInoSparse(ni) || NInoCompressed(ni)) {
 		ni->compressed_size = ni->allocated_size;
@@ -3450,7 +3450,7 @@ do_switch:
 			ni->compression_block_clusters = 0;
 		}
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * This needs to be last since we are not allowed to fail once we flip
 	 * this switch.
@@ -3913,7 +3913,7 @@ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni, s64 new_init_size)
 	BOOL data_size_updated = FALSE;
 
 #ifdef DEBUG
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ntfs_debug("Entering for mft_no 0x%llx, attribute type 0x%x, old data "
 			"size 0x%llx, old initialized size 0x%llx, new "
 			"initialized size 0x%llx.",
@@ -3922,7 +3922,7 @@ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni, s64 new_init_size)
 			(unsigned long long)ni->data_size,
 			(unsigned long long)ni->initialized_size,
 			(unsigned long long)new_init_size);
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 #endif /* DEBUG */
 	base_ni = ni;
 	if (NInoAttr(ni))
@@ -3944,7 +3944,7 @@ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni, s64 new_init_size)
 		goto put_err;
 	}
 	a = ctx->a;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (new_init_size >= 0) {
 		if (new_init_size < ni->initialized_size)
 			panic("%s(): new_init_size < ni->initialized_size\n",
@@ -3992,17 +3992,17 @@ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni, s64 new_init_size)
 			panic("%s(): !NInoNonResident(ni)\n", __FUNCTION__);
 		a->initialized_size = cpu_to_sle64(new_init_size);
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If this is a directory B+tree index allocation attribute also update
 	 * the sizes in the base inode.
 	 */
 	if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		if (data_size_updated)
 			base_ni->data_size = new_init_size;
 		base_ni->initialized_size = new_init_size;
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 	}
 	/* Mark the mft record dirty to ensure it gets written out. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
@@ -4074,13 +4074,13 @@ errno_t ntfs_attr_extend_initialized(ntfs_inode *ni, const s64 new_init_size)
 	unsigned attr_len;
 	BOOL locked, write_locked, is_sparse, mark_sizes_dirty;
 
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (new_init_size > ni->allocated_size)
 		panic("%s(): new_init_size > ni->allocated_size\n",
 				__FUNCTION__);
 	size = ni->data_size;
 	old_init_size = ni->initialized_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (new_init_size <= old_init_size)
 		panic("%s(): new_init_size <= old_init_size\n",
 				__FUNCTION__);
@@ -4131,9 +4131,9 @@ errno_t ntfs_attr_extend_initialized(ntfs_inode *ni, const s64 new_init_size)
 	bzero(kattr + attr_len, new_init_size - attr_len);
 	a->value_length = cpu_to_le32((u32)new_init_size);
 	/* Update the sizes in the ntfs inode as well as the ubc size. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->initialized_size = ni->data_size = size = new_init_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/* Mark the mft record dirty to ensure it gets written out. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	ntfs_attr_search_ctx_put(ctx);
@@ -4170,9 +4170,9 @@ do_non_resident_extend:
 			panic("%s(): size != sle64_to_cpu(a->data_size)\n",
 					__FUNCTION__);
 		size = new_init_size;
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ni->data_size = new_init_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		a->data_size = cpu_to_sle64(new_init_size);
 		/* Mark the mft record dirty to ensure it gets written out. */
 		NInoSetMrecNeedsDirtying(ctx->ni);
@@ -4277,9 +4277,9 @@ map_vcn:
 					if (ofs > old_init_size) {
 						if (ofs > new_init_size)
 							ofs = new_init_size;
-						lck_spin_lock(&ni->size_lock);
+						mtx_lock_spin(&ni->size_lock);
 						ni->initialized_size = ofs;
-						lck_spin_unlock(&ni->size_lock);
+						mtx_unlock_spin(&ni->size_lock);
 						if (ofs == new_init_size)
 							goto update_done;
 					}
@@ -4389,9 +4389,9 @@ map_vcn:
 			 */
 			if (ofs > new_init_size)
 				ofs = new_init_size;
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			ni->initialized_size = ofs;
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 		} else /* if (!is_sparse) */ {
 			upl_t upl;
 			upl_page_info_array_t pl;
@@ -4432,18 +4432,18 @@ on_disk_page:
 			ofs += PAGE_SIZE;
 			if (ofs > new_init_size)
 				ofs = new_init_size;
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			ni->initialized_size = ofs;
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			/* Set the page dirty so it gets written out. */
 			ntfs_page_unmap(ni, upl, pl, TRUE);
 		}
 	} while (ofs < new_init_size);
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (ni->initialized_size != new_init_size)
 		panic("%s(): ni->initialized_size != new_init_size\n",
 				__FUNCTION__);
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 update_done:
 	/* If we are holding the runlist lock, release it now. */
 	if (locked) {
@@ -4480,9 +4480,9 @@ unl_err:
 		else
 			sx_sunlock(&ni->rl.lock);
 	}
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->initialized_size = old_init_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	goto err;
 put_err:
 	ntfs_attr_search_ctx_put(ctx);
@@ -4728,10 +4728,10 @@ set_compressed_size:
 				ffs(ni->compression_block_size) - 1;
 		ni->compression_block_clusters = 1U << NTFS_COMPRESSION_UNIT;
 	}
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->compressed_size = ni->allocated_size;
 	a->compressed_size = a->allocated_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 is_compressed:
 	/* Mark both the attribute and the ntfs inode as sparse. */
 	a->flags |= ATTR_IS_SPARSE;
@@ -5100,9 +5100,9 @@ static void ntfs_attr_sparse_clear(ntfs_inode *base_ni, ntfs_inode *ni,
 				sizeof(a->compressed_size));
 		/* Set the compression unit to 0. */
 		a->compression_unit = 0;
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ni->compressed_size = 0;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		/* Clear the other related fields. */
 		ni->compression_block_size = 0;
 		ni->compression_block_clusters =
@@ -5223,11 +5223,11 @@ errno_t ntfs_attr_instantiate_holes(ntfs_inode *ni, s64 start, s64 end,
 	end_vcn = ((end + PAGE_MASK) & ~PAGE_MASK_64) >>
 			vol->cluster_size_shift;
 	/* Cache the sizes for the attribute so we take the size lock once. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	allocated_size = ni->allocated_size;
 	initialized_size = ni->initialized_size;
 	compressed_size = ni->compressed_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * We have to make sure that we stay within the existing allocated
 	 * size when instantiating holes as it would corrupt the attribute if
@@ -5499,10 +5499,10 @@ map_vcn:
 		 * update the compressed size.
 		 */
 		if (NInoSparse(ni) || NInoCompressed(ni)) {
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			ni->compressed_size = compressed_size;
 			a->compressed_size = cpu_to_sle64(compressed_size);
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 		}
 		/*
 		 * If this is the unnamed $DATA attribute also need to update
@@ -5815,10 +5815,10 @@ undo_sparse:
 	}
 	/* Restore the compressed size to the old value. */
 	compressed_size -= len << vol->cluster_size_shift;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->compressed_size = compressed_size;
 	a->compressed_size = cpu_to_sle64(compressed_size);
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/* Ensure the modified mft record is written out. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	if (ni == base_ni)
@@ -5950,9 +5950,9 @@ errno_t ntfs_attr_extend_allocation(ntfs_inode *ni, s64 new_alloc_size,
 
 	start = data_start;
 #ifdef DEBUG
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	old_alloc_size = ni->allocated_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	ntfs_debug("Entering for mft_no 0x%llx, attribute type 0x%x, "
 			"old_allocated_size 0x%llx, "
 			"new_allocated_size 0x%llx, new_data_size 0x%llx, "
@@ -5989,9 +5989,9 @@ retry_extend:
 	err = ntfs_attr_size_bounds_check(vol, ni->type, new_alloc_size);
 	if (err) {
 		/* Only emit errors when the write will fail completely. */
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		old_alloc_size = ni->allocated_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (start < 0 || start >= old_alloc_size) {
 			if (err == ERANGE) {
 				ntfs_error(vol->mp, "Cannot extend allocation "
@@ -6039,9 +6039,9 @@ retry_extend:
 		err = ENOMEM;
 		goto err_out;
 	}
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	alloc_size = ni->allocated_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If non-resident, seek to the last extent.  If resident, there is
 	 * only one extent, so seek to that.
@@ -6105,11 +6105,11 @@ retry_extend:
 				 * This cannot fail as it is a shrinking
 				 * resize.
 				 */
-				lck_spin_lock(&ni->size_lock);
+				mtx_lock_spin(&ni->size_lock);
 				err = ntfs_attr_record_resize(m, a,
 						le16_to_cpu(a->value_offset) +
 						ni->allocated_size);
-				lck_spin_unlock(&ni->size_lock);
+				mtx_unlock_spin(&ni->size_lock);
 				if (err)
 					panic("%s(): Failed to shrink "
 							"resident attribute "
@@ -6121,14 +6121,14 @@ retry_extend:
 			/* Zero the extended attribute value. */
 			bzero((u8*)a + le16_to_cpu(a->value_offset) + attr_len,
 					(u32)new_data_size - attr_len);
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			ni->initialized_size = ni->data_size = new_data_size;
 			a->value_length = cpu_to_le32((u32)new_data_size);
 		} else
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 		ni->allocated_size = le32_to_cpu(a->length) -
 				le16_to_cpu(a->value_offset);
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (new_data_size > attr_len)
 			a->value_length = cpu_to_le32((u32)new_data_size);
 		goto dirty_done;
@@ -6159,9 +6159,9 @@ retry_extend:
 			 * Only emit errors when the write will fail
 			 * completely.
 			 */
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			old_alloc_size = ni->allocated_size;
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			if (start < 0 || start >= old_alloc_size)
 				ntfs_error(vol->mp, "Cannot extend allocation "
 						"of mft_no 0x%llx, attribute "
@@ -6210,9 +6210,9 @@ retry_extend:
 	 */
 	if (arec_size > vol->mft_record_size - sizeof(MFT_RECORD)) {
 		/* Only emit errors when the write will fail completely. */
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		old_alloc_size = ni->allocated_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (start < 0 || start >= old_alloc_size)
 			ntfs_error(vol->mp, "Cannot extend allocation of "
 					"mft_no 0x%llx, attribute type 0x%x, "
@@ -7321,7 +7321,7 @@ update_sizes:
 		 */
 		a = actx->a;
 	}
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->allocated_size = new_alloc_size;
 	a->allocated_size = cpu_to_sle64(new_alloc_size);
 	if (NInoSparse(ni) || (ni->type != AT_INDEX_ALLOCATION &&
@@ -7329,11 +7329,11 @@ update_sizes:
 		ni->compressed_size += nr_allocated << vol->cluster_size_shift;
 		a->compressed_size = cpu_to_sle64(ni->compressed_size);
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		base_ni->allocated_size = new_alloc_size;
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 	}
 alloc_done:
 	if (new_data_size > sle64_to_cpu(a->data_size)) {
@@ -7351,14 +7351,14 @@ alloc_done:
 			 */ 
 			err = EIO;
 		}
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ni->data_size = new_data_size;
 		a->data_size = cpu_to_sle64(new_data_size);
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-			lck_spin_lock(&base_ni->size_lock);
+			mtx_lock_spin(&base_ni->size_lock);
 			base_ni->data_size = new_data_size;
-			lck_spin_unlock(&base_ni->size_lock);
+			mtx_unlock_spin(&base_ni->size_lock);
 		}
 	}
 dirty_done:
@@ -7503,12 +7503,12 @@ free_extent:
 		}
 	}
 undo_do_trunc:
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (alloc_size == ni->allocated_size) {
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		goto undo_skip_update_sizes;
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	ntfs_attr_search_ctx_reinit(actx);
 	/* Look up the first attribute extent. */
 	if (ntfs_attr_lookup(ni->type, ni->name, ni->name_len, 0, NULL, 0,
@@ -7521,7 +7521,7 @@ undo_do_trunc:
 		goto err_out;
 	}
 	a = actx->a;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->allocated_size = alloc_size;
 	a->allocated_size = cpu_to_sle64(alloc_size);
 	if (NInoSparse(ni) || (ni->type != AT_INDEX_ALLOCATION &&
@@ -7530,11 +7530,11 @@ undo_do_trunc:
 				vol->cluster_size_shift;
 		a->compressed_size = cpu_to_sle64(ni->compressed_size);
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		base_ni->allocated_size = alloc_size;
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 	}
 	/* Ensure the changes make it to disk. */
 	if (actx->ni != base_ni)
@@ -7565,9 +7565,9 @@ undo_skip_update_sizes:
 	 * the size in the vnode @ni->vn via ubc_setsize().
 	 */
 	if (!is_first) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ll = ni->data_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (ntfs_attr_resize(ni, ll, 0, ictx)) {
 			ntfs_error(vol->mp, "Failed to undo partial "
 					"allocation in inode 0x%llx in error "
@@ -7753,10 +7753,10 @@ retry_resize:
 	else
 		new_alloc_size = (new_size + 7) & ~7;
 	/* The current allocated size is the old allocated size. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	old_alloc_size = ni->allocated_size;
 	compressed_size = ni->compressed_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * The change in the file size.  This will be 0 if no change, >0 if the
 	 * size is growing, and <0 if the size is shrinking.
@@ -7845,7 +7845,7 @@ retry_resize:
 			!ntfs_resident_attr_value_resize(m, a, new_size)) {
 		/* The resize succeeded! */
 		NInoSetMrecNeedsDirtying(actx->ni);
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		/* Update the sizes in the ntfs inode and all is done. */
 		ni->allocated_size = le32_to_cpu(a->length) -
 				le16_to_cpu(a->value_offset);
@@ -7877,7 +7877,7 @@ retry_resize:
 		 * deadlocks.
 		 */
 		ni->initialized_size = new_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		goto unm_done;
 	}
 	/* If the above resize failed, this must be an attribute extension. */
@@ -8174,19 +8174,19 @@ do_non_resident_resize:
 		 * Make the valid size smaller (the UBC size is already
 		 * up-to-date).
 		 */
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		if (new_size < ni->initialized_size) {
 			ni->initialized_size = new_size;
 			a->initialized_size = cpu_to_sle64(new_size);
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			if (ni->name == I30 &&
 					ni->type == AT_INDEX_ALLOCATION) {
-				lck_spin_lock(&base_ni->size_lock);
+				mtx_lock_spin(&base_ni->size_lock);
 				base_ni->initialized_size = new_size;
-				lck_spin_unlock(&base_ni->size_lock);
+				mtx_unlock_spin(&base_ni->size_lock);
 			}
 		} else
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 		/*
 		 * If the size is shrinking it makes no sense for the
 		 * allocation to be growing.
@@ -8232,14 +8232,14 @@ do_non_resident_resize:
 	/* alloc_change <= 0 */
 	/* If the actual size is changing need to update it now. */
 	if (size_change) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ni->data_size = new_size;
 		a->data_size = cpu_to_sle64(new_size);
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-			lck_spin_lock(&base_ni->size_lock);
+			mtx_lock_spin(&base_ni->size_lock);
 			base_ni->data_size = new_size;
-			lck_spin_unlock(&base_ni->size_lock);
+			mtx_unlock_spin(&base_ni->size_lock);
 		}
 	}
 	/* Ensure the modified mft record is written out. */
@@ -8322,7 +8322,7 @@ do_non_resident_resize:
 		ntfs_attr_sparse_clear(base_ni, ni, actx);
 	}
 	/* Update the allocated/compressed size. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->allocated_size = new_alloc_size;
 	a->allocated_size = cpu_to_sle64(new_alloc_size);
 	if (NInoSparse(ni) || (ni->type != AT_INDEX_ALLOCATION &&
@@ -8335,11 +8335,11 @@ do_non_resident_resize:
 			a->compressed_size = cpu_to_sle64(ni->compressed_size);
 		}
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ni->name == I30 && ni->type == AT_INDEX_ALLOCATION) {
-		lck_spin_lock(&base_ni->size_lock);
+		mtx_lock_spin(&base_ni->size_lock);
 		base_ni->allocated_size = new_alloc_size;
-		lck_spin_unlock(&base_ni->size_lock);
+		mtx_unlock_spin(&base_ni->size_lock);
 	}
 	/*
 	 * We have the base attribute extent in @actx and we have set it up
@@ -8828,9 +8828,9 @@ errno_t ntfs_attr_set(ntfs_inode *ni, s64 ofs, const s64 cnt, const u8 val)
 	end = ofs + cnt;
 	end_ofs = (unsigned)end & PAGE_MASK;
 	/* If the end is outside the inode size return ESPIPE. */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (end > data_size) {
 		ntfs_error(vol->mp, "Request exceeds end of attribute.");
 		return ESPIPE;
@@ -8959,7 +8959,7 @@ errno_t ntfs_resident_attr_read(ntfs_inode *ni, const s64 ofs, const u32 cnt,
 		goto put_err;
 	}
 	a = ctx->a;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	/* These can happen when we race with a shrinking truncate. */
 	attr_len = le32_to_cpu(a->value_length);
 	if (attr_len > ni->data_size)
@@ -8970,7 +8970,7 @@ errno_t ntfs_resident_attr_read(ntfs_inode *ni, const s64 ofs, const u32 cnt,
 	init_len = attr_len;
 	if (init_len > ni->initialized_size)
 		init_len = ni->initialized_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If we are reading from the initialized attribute part, copy the data
 	 * over into the destination buffer.
@@ -9054,13 +9054,13 @@ errno_t ntfs_resident_attr_write(ntfs_inode *ni, u8 *buf, u32 cnt,
 	a = ctx->a;
 	if (a->non_resident)
 		panic("%s(): a->non_resident\n", __FUNCTION__);
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	/* These can happen when we race with a shrinking truncate. */
 	attr_len = le32_to_cpu(a->value_length);
 	if (ofs > attr_len) {
 		ntfs_error(ni->vol->mp, "Cannot write past end of resident "
 				"attribute.");
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		err = EINVAL;
 		goto put_err;
 	}
@@ -9070,7 +9070,7 @@ errno_t ntfs_resident_attr_write(ntfs_inode *ni, u8 *buf, u32 cnt,
 	}
 	if (ofs + cnt > ni->initialized_size)
 		ni->initialized_size = ofs + cnt;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/* Copy the data over from the destination buffer. */
 	memcpy((u8*)a + le16_to_cpu(a->value_offset) + ofs, buf, cnt);
 	/* Mark the mft record dirty to ensure it gets written out. */

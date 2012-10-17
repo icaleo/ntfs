@@ -374,11 +374,11 @@ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
 	if (ofs & PAGE_MASK)
 		panic("%s() called with non page aligned offset (0x%llx).",
 				__FUNCTION__, (unsigned long long)ofs);
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ubc_getsize(ni->vn);
 	if (size > ni->data_size)
 		size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ofs > size) {
 		ntfs_error(ni->vol->mp, "Offset 0x%llx is outside the end of "
 				"the attribute (0x%llx).",

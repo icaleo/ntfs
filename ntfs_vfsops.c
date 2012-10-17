@@ -1542,9 +1542,9 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 	 * The upcase size must not be above 64k Unicode characters, must not
 	 * be zero, and must be a multiple of sizeof(ntfschar).
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (data_size <= 0 || data_size & (sizeof(ntfschar) - 1) ||
 			data_size > (s64)(64 * 1024 * sizeof(ntfschar))) {
 		err = EINVAL;
@@ -1661,9 +1661,9 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 	 * The attribute definitions size must be above 0 and fit inside 31
 	 * bits.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (data_size <= 0 || data_size > 0x7fffffff) {
 		err = EINVAL;
 		goto err;
@@ -1938,9 +1938,9 @@ static errno_t ntfs_windows_hibernation_status_check(ntfs_volume *vol,
 		ntfs_error(vol->mp, "Failed to load hiberfil.sys.");
 		return err;
 	}
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (data_size < NTFS_HIBERFIL_HEADER_SIZE) {
 		ntfs_debug("Hiberfil.sys is present and smaller than the "
 				"hibernation header size.  Windows is "
@@ -2436,9 +2436,9 @@ not_enabled:
 		return err;
 	}
 	vol->usnjrnl_max_ni = max_ni;
-	lck_spin_lock(&max_ni->size_lock);
+	mtx_lock_spin(&max_ni->size_lock);
 	data_size = max_ni->data_size;
-	lck_spin_unlock(&max_ni->size_lock);
+	mtx_unlock_spin(&max_ni->size_lock);
 	if (data_size < (s64)sizeof(USN_HEADER)) {
 		ntfs_error(vol->mp, "Found corrupt $UsnJrnl/$DATA/$Max "
 				"attribute (size is 0x%llx but should be at "
@@ -2492,9 +2492,9 @@ not_enabled:
 	 * If the transaction log has been stamped and nothing has been written
 	 * to it since, we do not need to stamp it.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (sle64_to_cpu(uh->lowest_valid_usn) >= data_size) {
 		if (sle64_to_cpu(uh->lowest_valid_usn) == data_size) {
 			ntfs_page_unmap(max_ni, upl, pl, FALSE);
@@ -2656,9 +2656,9 @@ static errno_t ntfs_system_inodes_get(ntfs_volume *vol)
 	}
 	NInoSetSparseDisabled(ni);
 	vol->lcnbmp_ni = ni;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if ((vol->nr_clusters + 7) >> 3 > size) {
 		ntfs_error(vol->mp, "$Bitmap (%lld) is shorter than required "
 				"length of volume (%lld) as specified in the "
@@ -3178,10 +3178,10 @@ static errno_t ntfs_set_nr_mft_records(ntfs_volume *vol)
 	 * the $MFT/$DATA attribute.
 	 */
 	sx_xlock(&vol->mftbmp_lock);
-	lck_spin_lock(&vol->mft_ni->size_lock);
+	mtx_lock_spin(&vol->mft_ni->size_lock);
 	vol->nr_mft_records = vol->mft_ni->data_size >>
 			vol->mft_record_size_shift;
-	lck_spin_unlock(&vol->mft_ni->size_lock);
+	mtx_unlock_spin(&vol->mft_ni->size_lock);
 	err = ntfs_get_nr_set_bits(vol->mftbmp_ni->vn,
 			vol->mft_ni->initialized_size >>
 			vol->mft_record_size_shift, &nr_free);

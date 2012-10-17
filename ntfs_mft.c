@@ -118,17 +118,17 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 	 * If the wanted mft record number is out of bounds the mft record does
 	 * not exist.
 	 */
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	if (ni->mft_no > (ino64_t)(mft_ni->data_size >>
 			vol->mft_record_size_shift)) {
-		lck_spin_unlock(&mft_ni->size_lock);
+		mtx_unlock_spin(&mft_ni->size_lock);
 		ntfs_error(vol->mp, "Attempt to read mft record 0x%llx, which "
 				"is beyond the end of the mft.",
 				(unsigned long long)ni->mft_no);
 		err = ENOENT;
 		goto err;
 	}
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	/*
 	 * We implement access to $MFT/$DATA by mapping the buffer containing
 	 * the mft record into memory using buf_meta_bread() which takes care
@@ -525,20 +525,20 @@ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol, const s64 rec_no,
 		ntfs_error(vol->mp, "Failed to get vnode for mft mirror.");
 		goto err;
 	}
-	lck_spin_lock(&mirr_ni->size_lock);
+	mtx_lock_spin(&mirr_ni->size_lock);
 	data_size = ubc_getsize(mirr_vn);
 	if (data_size > mirr_ni->data_size)
 		data_size = mirr_ni->data_size;
 	/* Byte offset of the mft record. */
 	if ((rec_no << vol->mft_record_size_shift) + vol->mft_record_size >
 			mirr_ni->initialized_size) {
-		lck_spin_unlock(&mirr_ni->size_lock);
+		mtx_unlock_spin(&mirr_ni->size_lock);
 		ntfs_error(vol->mp, "Write past the initialized size of mft "
 				"mirror.");
 		err = EIO;
 		goto put;
 	}
-	lck_spin_unlock(&mirr_ni->size_lock);
+	mtx_unlock_spin(&mirr_ni->size_lock);
 	/*
 	 * Map the buffer containing the mft mirror record.
 	 *
@@ -640,12 +640,12 @@ static errno_t ntfs_mft_bitmap_find_and_alloc_free_rec_nolock(ntfs_volume *vol,
 	 */
 	if (!vol->mft_ni)
 		panic("%s: !mft_ni\n", __FUNCTION__);
-	lck_spin_lock(&vol->mft_ni->size_lock);
+	mtx_lock_spin(&vol->mft_ni->size_lock);
 	pass_end = vol->mft_ni->allocated_size >> vol->mft_record_size_shift;
-	lck_spin_unlock(&vol->mft_ni->size_lock);
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&vol->mft_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	ll = mftbmp_ni->initialized_size << 3;
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 	if (pass_end > ll)
 		pass_end = ll;
 	pass = 1;
@@ -814,9 +814,9 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	 * zero first.
 	 */
 	sx_xlock(&mftbmp_ni->rl.lock);
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	allocated_size = mftbmp_ni->allocated_size;
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 	vcn = (allocated_size - 1) >> vol->cluster_size_shift;
 	err = ntfs_attr_find_vcn_nolock(mftbmp_ni, vcn, &rl, NULL);
 	if (err || !rl || !rl->length || rl->lcn < 0 || rl[1].length ||
@@ -1006,10 +1006,10 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 		/* @m is not used any more so no need to set it. */
 		a = ctx->a;
 	}
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	mftbmp_ni->allocated_size += vol->cluster_size;
 	a->allocated_size = cpu_to_sle64(mftbmp_ni->allocated_size);
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 	/* Ensure the changes make it to disk. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	ntfs_attr_search_ctx_put(ctx);
@@ -1028,9 +1028,9 @@ restore_undo_alloc:
 	if (err2) {
 		ntfs_error(vol->mp, "Failed to find last attribute extent of "
 				"mft bitmap attribute (error %d).%s", err2, es);
-		lck_spin_lock(&mftbmp_ni->size_lock);
+		mtx_lock_spin(&mftbmp_ni->size_lock);
 		mftbmp_ni->allocated_size += vol->cluster_size;
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 		ntfs_attr_search_ctx_put(ctx);
 		ntfs_mft_record_unmap(mft_ni);
 		sx_xunlock(&mftbmp_ni->rl.lock);
@@ -1147,7 +1147,7 @@ static errno_t ntfs_mft_bitmap_extend_initialized_nolock(ntfs_volume *vol)
 		goto put_err;
 	}
 	a = ctx->a;
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	old_data_size = mftbmp_ni->data_size;
 	old_initialized_size = mftbmp_ni->initialized_size;
 	/*
@@ -1161,12 +1161,12 @@ static errno_t ntfs_mft_bitmap_extend_initialized_nolock(ntfs_volume *vol)
 		const s64 init_size = mftbmp_ni->initialized_size;
 		mftbmp_ni->data_size = init_size;
 		a->data_size = cpu_to_sle64(init_size);
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 		if (!ubc_setsize(mftbmp_ni->vn, init_size))
 			panic("%s(): !ubc_setsize(mftbmp_ni->vn, init_size)\n",
 					__FUNCTION__);
 	} else
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 	/* Ensure the changes make it to disk. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	ntfs_attr_search_ctx_put(ctx);
@@ -1203,28 +1203,28 @@ static errno_t ntfs_mft_bitmap_extend_initialized_nolock(ntfs_volume *vol)
 		goto put_err;
 	}
 	a = ctx->a;
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	mftbmp_ni->initialized_size = old_initialized_size;
 	a->initialized_size = cpu_to_sle64(old_initialized_size);
 	if (ubc_getsize(mftbmp_ni->vn) != old_data_size) {
 		mftbmp_ni->data_size = old_data_size;
 		a->data_size = cpu_to_sle64(old_data_size);
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 		if (!ubc_setsize(mftbmp_ni->vn, old_data_size))
 			ntfs_error(vol->mp, "Failed to restore UBC size.  "
 					"Leaving UBC size out of sync with "
 					"attribute data size.");
 	} else
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 	NInoSetMrecNeedsDirtying(ctx->ni);
 #ifdef DEBUG
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	ntfs_debug("Restored status of mftbmp: allocated_size 0x%llx, "
 			"data_size 0x%llx, initialized_size 0x%llx.",
 			(unsigned long long)mftbmp_ni->allocated_size,
 			(unsigned long long)mftbmp_ni->data_size,
 			(unsigned long long)mftbmp_ni->initialized_size);
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 #endif /* DEBUG */
 put_err:
 	ntfs_attr_search_ctx_put(ctx);
@@ -1270,9 +1270,9 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 
 	ntfs_debug("Extending mft data allocation.");
 	mft_ni = vol->mft_ni;
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	allocated_size = mft_ni->allocated_size;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	vcn = (allocated_size - 1) >> vol->cluster_size_shift;
 	/*
 	 * Determine the preferred allocation location, i.e. the last lcn of
@@ -1373,9 +1373,9 @@ static errno_t ntfs_mft_data_extend_allocation_nolock(ntfs_volume *vol)
 		return err;
 	}
 	ntfs_debug("Allocated %lld clusters.", (long long)nr);
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	mft_ni->allocated_size += nr << vol->cluster_size_shift;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	/*
 	 * We now have to drop the runlist lock again or we can deadlock with
 	 * the below mapping of the mft record belonging to $MFT.
@@ -1562,9 +1562,9 @@ undo_alloc:
 	 * the runlist lock for writing.
 	 */
 	sx_xlock(&mft_ni->rl.lock);
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	mft_ni->allocated_size -= nr << vol->cluster_size_shift;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	err2 = ntfs_rl_truncate_nolock(vol, &mft_ni->rl, vcn + 1);
 	sx_xunlock(&mft_ni->rl.lock);
 	if (err2) {
@@ -1740,14 +1740,14 @@ static errno_t ntfs_mft_record_format(ntfs_volume *vol, const s64 mft_no,
 				(unsigned long long)mft_no, err);
 		goto brelse;
 	}
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	if (new_initialized_size < mft_ni->initialized_size ||
 			new_initialized_size > mft_ni->data_size)
 		panic("%s(): new_initialized_size < mft_ni->initialized_size "
 				"|| new_initialized_size > mft_ni->data_size\n",
 				__FUNCTION__);
 	mft_ni->initialized_size = new_initialized_size;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	err = buf_bdwrite(buf);
 	if (!err) {
 		ntfs_debug("Done.");
@@ -2107,12 +2107,12 @@ retry_mftbmp_alloc:
 	 * the first 24 mft records as they are special and whilst they may not
 	 * be in use, we do not allocate from them.
 	 */
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	ll = mft_ni->initialized_size >> vol->mft_record_size_shift;
-	lck_spin_unlock(&mft_ni->size_lock);
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	old_data_initialized = mftbmp_ni->initialized_size;
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 	if (old_data_initialized << 3 > ll && old_data_initialized > 3) {
 		bit = ll;
 		if (bit < 24)
@@ -2140,14 +2140,14 @@ retry_mftbmp_alloc:
 	 */
 	if (bit >= (1LL << 32))
 		goto max_err;
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	old_data_size = mftbmp_ni->allocated_size;
 	ntfs_debug("Status of mftbmp before extension: allocated_size 0x%llx, "
 			"data_size 0x%llx, initialized_size 0x%llx.",
 			(unsigned long long)old_data_size,
 			(unsigned long long)mftbmp_ni->data_size,
 			(unsigned long long)old_data_initialized);
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 	if (old_data_initialized + 8 > old_data_size) {
 		/* Need to extend bitmap by one more cluster. */
 		ntfs_debug("mftbmp: initialized_size + 8 > allocated_size.");
@@ -2155,7 +2155,7 @@ retry_mftbmp_alloc:
 		if (err)
 			goto unl_err;
 #ifdef DEBUG
-		lck_spin_lock(&mftbmp_ni->size_lock);
+		mtx_lock_spin(&mftbmp_ni->size_lock);
 		ntfs_debug("Status of mftbmp after allocation extension: "
 				"allocated_size 0x%llx, data_size 0x%llx, "
 				"initialized_size 0x%llx.",
@@ -2163,7 +2163,7 @@ retry_mftbmp_alloc:
 				(unsigned long long)mftbmp_ni->data_size,
 				(unsigned long long)
 				mftbmp_ni->initialized_size);
-		lck_spin_unlock(&mftbmp_ni->size_lock);
+		mtx_unlock_spin(&mftbmp_ni->size_lock);
 #endif /* DEBUG */
 	}
 	/*
@@ -2175,14 +2175,14 @@ retry_mftbmp_alloc:
 	if (err)
 		goto unl_err;
 #ifdef DEBUG
-	lck_spin_lock(&mftbmp_ni->size_lock);
+	mtx_lock_spin(&mftbmp_ni->size_lock);
 	ntfs_debug("Status of mftbmp after initialized extension: "
 			"allocated_size 0x%llx, data_size 0x%llx, "
 			"initialized_size 0x%llx.",
 			(unsigned long long)mftbmp_ni->allocated_size,
 			(unsigned long long)mftbmp_ni->data_size,
 			(unsigned long long)mftbmp_ni->initialized_size);
-	lck_spin_unlock(&mftbmp_ni->size_lock);
+	mtx_unlock_spin(&mftbmp_ni->size_lock);
 #endif /* DEBUG */
 	ntfs_debug("Found free record (#3), bit 0x%llx.",
 			(unsigned long long)bit);
@@ -2210,9 +2210,9 @@ have_alloc_rec:
 	mft_ni_write_locked = FALSE;
 mft_relocked:
 	ll = (bit + 1) << vol->mft_record_size_shift;
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	old_data_initialized = mft_ni->initialized_size;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	if (ll <= old_data_initialized) {
 		ntfs_debug("Allocated mft record already initialized.");
 		goto mft_rec_already_initialized;
@@ -2231,7 +2231,7 @@ mft_relocked:
 	 * actually traversed more than once when a freshly formatted volume is
 	 * first written to so it optimizes away nicely in the common case.
 	 */
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	ntfs_debug("Status of mft data before extension: "
 			"allocated_size 0x%llx, data_size 0x%llx, "
 			"initialized_size 0x%llx.",
@@ -2239,7 +2239,7 @@ mft_relocked:
 			(unsigned long long)mft_ni->data_size,
 			(unsigned long long)mft_ni->initialized_size);
 	while (ll > mft_ni->allocated_size) {
-		lck_spin_unlock(&mft_ni->size_lock);
+		mtx_unlock_spin(&mft_ni->size_lock);
 		err = ntfs_mft_data_extend_allocation_nolock(vol);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to extend mft data "
@@ -2247,7 +2247,7 @@ mft_relocked:
 			sx_xunlock(&mft_ni->lock);
 			goto undo_mftbmp_alloc_locked;
 		}
-		lck_spin_lock(&mft_ni->size_lock);
+		mtx_lock_spin(&mft_ni->size_lock);
 		ntfs_debug("Status of mft data after allocation extension: "
 				"allocated_size 0x%llx, data_size 0x%llx, "
 				"initialized_size 0x%llx.",
@@ -2255,7 +2255,7 @@ mft_relocked:
 				(unsigned long long)mft_ni->data_size,
 				(unsigned long long)mft_ni->initialized_size);
 	}
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	/*
 	 * Extend mft data initialized size (and data size of course) to reach
 	 * the allocated mft record, formatting the mft records allong the way.
@@ -2264,7 +2264,7 @@ mft_relocked:
 	 * needed by ntfs_mft_record_format().  We will update the attribute
 	 * record itself in one fell swoop later on.
 	 */
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	old_data_initialized = mft_ni->initialized_size;
 	old_data_size = mft_ni->data_size;
 	nr_mft_records_added = 0;
@@ -2292,13 +2292,13 @@ mft_relocked:
 					"nr_mft_records_added %lld.",
 					(long long)nr_mft_records_added);
 			mft_ni->data_size = new_initialized_size;
-			lck_spin_unlock(&mft_ni->size_lock);
+			mtx_unlock_spin(&mft_ni->size_lock);
 			if (!ubc_setsize(mft_ni->vn, new_initialized_size))
 				panic("%s(): ubc_setsize() failed.\n",
 						__FUNCTION__);
 			mark_sizes_dirty = TRUE;
 		} else
-			lck_spin_unlock(&mft_ni->size_lock);
+			mtx_unlock_spin(&mft_ni->size_lock);
 		ntfs_debug("Initializing mft record 0x%llx.",
 				(unsigned long long)mft_no);
 		/*
@@ -2310,9 +2310,9 @@ mft_relocked:
 			ntfs_error(vol->mp, "Failed to format mft record.");
 			goto undo_data_init;
 		}
-		lck_spin_lock(&mft_ni->size_lock);
+		mtx_lock_spin(&mft_ni->size_lock);
 	}
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	record_formatted = TRUE;
 	/*
 	 * Update the mft data attribute record to reflect the new sizes.
@@ -2350,7 +2350,7 @@ mft_relocked:
 		goto undo_data_init;
 	}
 	a = ctx->a;
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	a->initialized_size = cpu_to_sle64(mft_ni->initialized_size);
 	a->data_size = cpu_to_sle64(mft_ni->data_size);
 	/*
@@ -2362,7 +2362,7 @@ mft_relocked:
 	if (vol->nr_free_mft_records >= vol->nr_mft_records)
 		panic("%s(): vol->nr_free_mft_records > vol->nr_mft_records\n",
 				__FUNCTION__);
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	/* Ensure the changes make it to disk. */
 	NInoSetMrecNeedsDirtying(ctx->ni);
 	ntfs_attr_search_ctx_put(ctx);
@@ -2374,7 +2374,7 @@ mft_relocked:
 	 */
 	if (mark_sizes_dirty)
 		NInoSetDirtySizes(mft_ni);
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	ntfs_debug("Status of mft data after mft record initialization: "
 			"allocated_size 0x%llx, data_size 0x%llx, "
 			"initialized_size 0x%llx.",
@@ -2390,7 +2390,7 @@ mft_relocked:
 	if (mft_ni->initialized_size > mft_ni->data_size)
 		panic("%s(): mft_ni->initialized_size > mft_ni->data_size\n",
 				__FUNCTION__);
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	sx_downgrade(&mft_ni->lock);
 mft_rec_already_initialized:
 	/*
@@ -2922,15 +2922,15 @@ retry:
 	*new_m = m;
 	return err;
 undo_data_init:
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	mft_ni->initialized_size = old_data_initialized;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	if (!ubc_setsize(mft_ni->vn, old_data_size))
 		panic("%s(): !ubc_setsize(mft_ni->vn, old_data_size)\n",
 				__FUNCTION__);
-	lck_spin_lock(&mft_ni->size_lock);
+	mtx_lock_spin(&mft_ni->size_lock);
 	mft_ni->data_size = old_data_size;
-	lck_spin_unlock(&mft_ni->size_lock);
+	mtx_unlock_spin(&mft_ni->size_lock);
 	sx_xunlock(&mft_ni->lock);
 	goto undo_mftbmp_alloc_locked;
 free_undo_mftbmp_alloc:

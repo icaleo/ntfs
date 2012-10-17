@@ -120,10 +120,10 @@ int ntfs_cluster_iodone(buf_t cbp, void *arg __unused)
 		}
 		/* The offset in the attribute at which this buffer begins. */
 		ofs = (s64)buf_lblkno(cbp) << PAGE_SHIFT;
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		data_size = ni->data_size;
 		init_size = ni->initialized_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		/*
 		 * Limit mst deprotection to the initialized size as beyond
 		 * that the data is zero and deprotection will fail.  And worse
@@ -225,10 +225,10 @@ static void ntfs_buf_iodone(buf_t buf, void *arg __unused)
 	if (size != ni->block_size)
 		panic("%s(): size != ni->block_size\n", __FUNCTION__);
 	ofs = (s64)buf_lblkno(buf) << ni->block_size_shift;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	data_size = ni->data_size;
 	init_size = ni->initialized_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	b_flags = buf_flags(buf);
 	/*
 	 * Limit mst deprotection to the initialized size as beyond that the
@@ -378,7 +378,7 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 	 */
 	lblkno = buf_lblkno(buf);
 	ofs = lblkno << ni->block_size_shift;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	max_end_io = ni->initialized_size;
 	do_fixup = FALSE;
 	if (b_flags & B_READ) {
@@ -387,7 +387,7 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 				panic("%s() initialized_size > data_size\n",
 						__FUNCTION__);
 			if (ofs < ni->data_size) {
-				lck_spin_unlock(&ni->size_lock);
+				mtx_unlock_spin(&ni->size_lock);
 				buf_clear(buf);
 				buf_biodone(buf);
 				ntfs_debug("Read past initialized size.  "
@@ -398,7 +398,7 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 		max_end_io = ni->data_size;
 		do_fixup = TRUE;
 	}
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ofs >= max_end_io) {
 		/* I/o is out of range.  This should never happen. */
 		ntfs_error(vol->mp, "Trying to %s buffer for $MFT/$DATA which "
@@ -1812,7 +1812,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 				va->va_data_size = 0;
 		break;
 	default:
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		/*
 		 * We cheat for both the total size and the total allocated
 		 * size and just return the attribute size rather than looping
@@ -1838,7 +1838,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 				on_disk_size = ni->allocated_size;
 		}
 		va->va_total_alloc = va->va_data_alloc = on_disk_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 	}
 	va->va_iosize = ubc_upl_maxbufsize();
 	va->va_uid = ni->uid;
@@ -2453,11 +2453,11 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 	if (!NInoRaw(raw_ni))
 		panic("%s(): Requested raw inode but got non-raw one.\n",
 				__FUNCTION__);
-	lck_spin_lock(&raw_ni->size_lock);
+	mtx_lock_spin(&raw_ni->size_lock);
 	size = ubc_getsize(raw_ni->vn);
 	if (size != raw_ni->data_size)
 		panic("%s(): size != raw_ni->data_size\n", __FUNCTION__);
-	lck_spin_unlock(&raw_ni->size_lock);
+	mtx_unlock_spin(&raw_ni->size_lock);
 	/*
 	 * If nothing was requested or the request starts at or beyond the end
 	 * of the attribute, we do not need to do anything.
@@ -2788,11 +2788,11 @@ static errno_t ntfs_read(ntfs_inode *ni, uio_t uio, const int ioflags,
 	 * issue when the write code has been written and remove the check if
 	 * appropriate simply using ubc_getsize(vn); without the size_lock.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ubc_getsize(vn);
 	if (size > ni->data_size)
 		size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If nothing was requested or the request starts at or beyond the end
 	 * of the attribute, we do not need to do anything.
@@ -3154,9 +3154,9 @@ static errno_t ntfs_write(ntfs_inode *ni, uio_t uio, int ioflags,
 			cache_purge(ni->vn);
 			return ENOENT;
 		}
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		ofs = ni->data_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		uio_setoffset(uio, ofs);
 		ntfs_debug("Write to mft_no 0x%llx, IO_APPEND flag is set, "
 				"setting uio_offset() to file size 0x%llx.",
@@ -3190,9 +3190,9 @@ recheck_deleted:
 			cache_purge(ni->vn);
 			return ENOENT;
 		}
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		size = ni->initialized_size;
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (!write_locked && end > size) {
 			/* If we fail to convert the lock, take it. */
 			if (!sx_try_upgrade(&ni->lock))
@@ -3220,10 +3220,10 @@ recheck_deleted:
 	 * lose that.
 	 */
 	ioflags |= IO_NOZEROVALID | IO_NOZERODIRTY;
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	old_size = ni->data_size;
 	size = ni->allocated_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If this is a sparse attribute and the write overlaps the existing
 	 * allocated size we need to fill any holes overlapping the write.  We
@@ -3321,9 +3321,9 @@ recheck_deleted:
 				uio_setresid(uio, new_count);
 			}
 		} else /* if (err) */ {
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			size = ni->allocated_size;
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			/* Perform a partial write if possible or fail. */
 			if (ofs < size && !(ioflags & IO_UNIT)) {
 				s64 new_count;
@@ -3359,9 +3359,9 @@ recheck_deleted:
 	 * increments the data size as well as the ubc size to keep it above or
 	 * equal to the initialized size.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ni->initialized_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (ofs > size) {
 		if (!write_locked)
 			panic("%s(): !write_locked 2\n", __FUNCTION__);
@@ -3551,9 +3551,9 @@ done:
 	 * ntfs_attr_set_initialized_size() so we do not need to do it here.
 	 */
 	size = uio_offset(uio);
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (size > ni->initialized_size) {
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		if (!write_locked)
 			panic("%s(): !write_locked 3\n", __FUNCTION__);
 		err = ntfs_attr_set_initialized_size(ni, size);
@@ -3568,9 +3568,9 @@ done:
 			 * nothing was written ensure everything is set up as
 			 * if the write never happened.
 			 */
-			lck_spin_lock(&ni->size_lock);
+			mtx_lock_spin(&ni->size_lock);
 			size = ni->initialized_size;
-			lck_spin_unlock(&ni->size_lock);
+			mtx_unlock_spin(&ni->size_lock);
 			if (ioflags & IO_UNIT || old_ofs >= size ||
 					uio_resid(uio) >= old_count)
 				goto abort;
@@ -3584,7 +3584,7 @@ done:
 			err = 0;
 		}
 	} else
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 	// TODO: If we wrote anything at all we have to clear the S_ISUID and
 	// S_ISGID bits in the file mode as a precaution against tampering
 	// (see xnu/bsd/hfs/hfs_readwrite.c::hfs_vnop_write()).
@@ -3696,10 +3696,10 @@ abort:
 			 */
 			is_dirty = (err);
 			if (is_dirty) {
-				lck_spin_lock(&ni->size_lock);
+				mtx_lock_spin(&ni->size_lock);
 				if (truncate_size == ni->data_size)
 					is_dirty = FALSE;
-				lck_spin_unlock(&ni->size_lock);
+				mtx_unlock_spin(&ni->size_lock);
 			}
 			ntfs_error(ni->vol->mp, "Truncate failed (error %d).%s",
 					err2, is_dirty ? "  Leaving "
@@ -5116,12 +5116,12 @@ static errno_t ntfs_link_internal(ntfs_inode *ni, ntfs_inode *dir_ni,
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	fn->last_access_time = utc2ntfs(ni->last_access_time);
 	if (!is_dir) {
-		lck_spin_lock(&ni->size_lock);
+		mtx_lock_spin(&ni->size_lock);
 		fn->allocated_size = cpu_to_sle64(NInoNonResident(ni) &&
 				(NInoSparse(ni) || NInoCompressed(ni)) ?
 				ni->compressed_size : ni->allocated_size);
 		fn->data_size = cpu_to_sle64(ni->data_size);
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 	} else {
 		/*
 		 * Directories use 0 for the sizes in the filename attribute
@@ -6674,12 +6674,12 @@ retry:
 	 * @raw_ni->size_lock as the values cannot change at present as we are
 	 * holding the inode lock @raw_ni->lock for write.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	ni->initialized_size = raw_ni->initialized_size;
 	ni->data_size = raw_ni->data_size;
 	ni->allocated_size = raw_ni->allocated_size;
 	ni->compressed_size = raw_ni->compressed_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (NInoNonResident(raw_ni))
 		NInoSetNonResident(ni);
 	sx_xunlock(&raw_ni->lock);
@@ -6921,9 +6921,9 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	 * inode is compressed or encrypted we cannot read it as we are already
 	 * using the raw inode and we can only have one raw inode.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	size = ni->data_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/* Zero length symbolic links are not allowed. */
 	if (!size || size > MAXPATHLEN) {
 		ntfs_error(ni->vol->mp, "Invalid symbolic link size %lld in "
@@ -6943,14 +6943,14 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	if (!NInoRaw(raw_ni))
 		panic("%s(): Requested raw inode but got non-raw one.\n",
 				__FUNCTION__);
-	lck_spin_lock(&raw_ni->size_lock);
+	mtx_lock_spin(&raw_ni->size_lock);
 	if (size > ubc_getsize(raw_ni->vn) || size != raw_ni->data_size)
 		panic("%s(): size (0x%llx) > ubc_getsize(raw_ni->vn, 0x%llx) "
 				"|| size != raw_ni->data_size (0x%llx)\n",
 				__FUNCTION__, (unsigned long long)size,
 				(unsigned long long)ubc_getsize(raw_ni->vn),
 				(unsigned long long)raw_ni->data_size);
-	lck_spin_unlock(&raw_ni->size_lock);
+	mtx_unlock_spin(&raw_ni->size_lock);
 	/* Perform the actual read of the symbolic link data into the uio. */
 	err = ntfs_read(raw_ni, uio, 0, TRUE);
 	sx_sunlock(&raw_ni->lock);
@@ -8281,7 +8281,7 @@ retry_pageout:
 	 * issue when the write code has been written and remove the check if
 	 * appropriate simply using ubc_getsize(vn); without the size_lock.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	attr_size = ubc_getsize(a->a_vp);
 	if (attr_size > ni->data_size)
 		attr_size = ni->data_size;
@@ -8292,7 +8292,7 @@ retry_pageout:
 	 */
 	if (attr_ofs < 0 || attr_ofs >= attr_size || attr_ofs & PAGE_MASK_64 ||
 			size & PAGE_MASK || upl_ofs & PAGE_MASK) {
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		err = EINVAL;
 		goto err;
 	}
@@ -8316,14 +8316,14 @@ retry_pageout:
 	// modify the data size and only the initialized size instead.
 	if (attr_ofs + size > ni->initialized_size && ni->initialized_size !=
 			ni->data_size) {
-		lck_spin_unlock(&ni->size_lock);
+		mtx_unlock_spin(&ni->size_lock);
 		ntfs_error(vol->mp, "Writing beyond the initialized size of "
 				"an attribute is not implemented yet.");
 		err = ENOTSUP;
 		goto err;
 	}
 	alloc_size = ni->allocated_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	/*
 	 * If this is a sparse attribute we need to fill any holes overlapping
 	 * the write.  We can skip resident attributes as they cannot have
@@ -8863,11 +8863,11 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 	 * issue when the write code has been written and remove the check if
 	 * appropriate simply using ubc_getsize(ni->vn); without the size_lock.
 	 */
-	lck_spin_lock(&ani->size_lock);
+	mtx_lock_spin(&ani->size_lock);
 	size = ubc_getsize(ani->vn);
 	if (size > ani->data_size)
 		size = ani->data_size;
-	lck_spin_unlock(&ani->size_lock);
+	mtx_unlock_spin(&ani->size_lock);
 	if (!uio)
 		*a->a_size = size;
 	else if (ntfs_name != NTFS_SFM_RESOURCEFORK_NAME &&
@@ -9280,11 +9280,11 @@ static int ntfs_vnop_setxattr(struct vnop_setxattr_args *a)
 	 * issue when the write code has been written and remove the check if
 	 * appropriate simply using ubc_getsize(ni->vn); without the size_lock.
 	 */
-	lck_spin_lock(&ani->size_lock);
+	mtx_lock_spin(&ani->size_lock);
 	size = ubc_getsize(ani->vn);
 	if (size > ani->data_size)
 		size = ani->data_size;
-	lck_spin_unlock(&ani->size_lock);
+	mtx_unlock_spin(&ani->size_lock);
 	/*
 	 * Perform the actual write to the attribute inode.  We pass in IO_UNIT
 	 * as we want an atomic i/o operation.
@@ -10270,14 +10270,14 @@ static int ntfs_vnop_blockmap(struct vnop_blockmap_args *a)
 	 * Note it does not matter if we are racing with truncate because that
 	 * will be detected during the runlist lookup below.
 	 */
-	lck_spin_lock(&ni->size_lock);
+	mtx_lock_spin(&ni->size_lock);
 	if (is_write)
 		max_size = ni->allocated_size;
 	else
 		max_size = ni->data_size;
 	data_size = ni->data_size;
 	init_size = ni->initialized_size;
-	lck_spin_unlock(&ni->size_lock);
+	mtx_unlock_spin(&ni->size_lock);
 	if (byte_offset >= max_size) {
 eof:
 		ntfs_error(vol->mp, "Called for inode 0x%llx, size 0x%llx, "
