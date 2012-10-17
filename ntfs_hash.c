@@ -53,7 +53,7 @@ static ntfs_inode_list_head *ntfs_inode_hash_table;
 static unsigned long ntfs_inode_hash_mask;
 
 /* A sleeping lock to protect concurrent accesses to the ntfs inode hash. */
-lck_mtx_t ntfs_inode_hash_lock;
+struct mtx ntfs_inode_hash_lock;
 
 /**
  * ntfs_inode_hash_init - initialize the ntfs inode hash
@@ -71,7 +71,7 @@ errno_t ntfs_inode_hash_init(void)
 	}
 	ntfs_debug("ntfs_inode_hash_mask 0x%lx.", ntfs_inode_hash_mask);
 	/* Initialize the ntfs inode hash lock. */
-	lck_mtx_init(&ntfs_inode_hash_lock, ntfs_lock_grp, ntfs_lock_attr);
+	mtx_init(&ntfs_inode_hash_lock, "ntfs inode hash lock", NULL, MTX_DEF);
 	return 0;
 }
 
@@ -83,7 +83,7 @@ errno_t ntfs_inode_hash_init(void)
 void ntfs_inode_hash_deinit(void)
 {
 	/* Deinitialize the ntfs inode hash lock. */
-	lck_mtx_destroy(&ntfs_inode_hash_lock, ntfs_lock_grp);
+	mtx_destroy(&ntfs_inode_hash_lock);
 	/*
 	 * Free the ntfs inode hash.
 	 *
@@ -168,7 +168,7 @@ retry:
 #endif
 			/* Drops the hash lock. */
 			ntfs_inode_wait(ni, &ntfs_inode_hash_lock);
-			lck_mtx_lock(&ntfs_inode_hash_lock);
+			mtx_lock(&ntfs_inode_hash_lock);
 			goto retry;
 		}
 		/* Found the inode. */
@@ -192,7 +192,7 @@ static inline ntfs_inode *ntfs_inode_hash_list_find(const ntfs_volume *vol,
 	ntfs_inode *ni;
 
 retry:
-	lck_mtx_lock(&ntfs_inode_hash_lock);
+	mtx_lock(&ntfs_inode_hash_lock);
 	ni = ntfs_inode_hash_list_find_nolock(vol, list, na);
 	if (ni) {
 		vnode_t vn;
@@ -209,12 +209,12 @@ retry:
 		vn = ni->vn;
 		if (vn)
 			vn_id = vnode_vid(vn);
-		lck_mtx_unlock(&ntfs_inode_hash_lock);
+		mtx_unlock(&ntfs_inode_hash_lock);
 		if (vn && vnode_getwithvid(vn, vn_id))
 			goto retry;
 		return ni;
 	}
-	lck_mtx_unlock(&ntfs_inode_hash_lock);
+	mtx_unlock(&ntfs_inode_hash_lock);
 	return ni;
 }
 
@@ -284,7 +284,7 @@ ntfs_inode *ntfs_inode_hash_get(ntfs_volume *vol, const ntfs_attr *na)
 	 * allocate the inode by searching for it again in the cache.
 	 */
 retry:
-	lck_mtx_lock(&ntfs_inode_hash_lock);
+	mtx_lock(&ntfs_inode_hash_lock);
 	ni = ntfs_inode_hash_list_find_nolock(vol, list, na);
 	if (ni) {
 		/*
@@ -311,7 +311,7 @@ retry:
 	 * the hash list bucket and drop the hash lock.
 	 */
 	LIST_INSERT_HEAD(list, nni, hash);
-	lck_mtx_unlock(&ntfs_inode_hash_lock);
+	mtx_unlock(&ntfs_inode_hash_lock);
 	/* Add the inode to the list of inodes in the volume. */
 	mtx_lock(&vol->inodes_lock);
 	LIST_INSERT_HEAD(&vol->inodes, nni, inodes);
@@ -328,7 +328,7 @@ retry:
  */
 void ntfs_inode_hash_rm(ntfs_inode *ni)
 {
-	lck_mtx_lock(&ntfs_inode_hash_lock);
+	mtx_lock(&ntfs_inode_hash_lock);
 	ntfs_inode_hash_rm_nolock(ni);
-	lck_mtx_unlock(&ntfs_inode_hash_lock);
+	mtx_unlock(&ntfs_inode_hash_lock);
 }

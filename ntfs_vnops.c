@@ -7301,7 +7301,7 @@ sync:
 	 * First, remove the inode from the inode cache so it cannot be found
 	 * any more.
 	 */
-	lck_mtx_lock(&ntfs_inode_hash_lock);
+	mtx_lock(&ntfs_inode_hash_lock);
 	/*
 	 * Mark the inode as having been deleted so we do not try to remove it
 	 * from the ntfs inode hash again in ntfs_inode_reclaim().
@@ -7312,7 +7312,7 @@ sync:
 	 * any more.
 	 */
 	ntfs_inode_hash_rm_nolock(ni);
-	lck_mtx_unlock(&ntfs_inode_hash_lock);
+	mtx_unlock(&ntfs_inode_hash_lock);
 	/* Remove the inode from the name cache if it is still in it. */
 	cache_purge(vn);
 	/*

@@ -506,7 +506,7 @@ __private_extern__ errno_t ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni,
 #define ntfs_inode_wait_locked(ni, lock)			\
 	do {							\
 	 	if (NInoLocked(ni)) {				\
-			lck_mtx_t *lck = lock;			\
+			struct mtx *lck = lock;			\
 			do {					\
 				/* Drops lock. */		\
 	 			ntfs_inode_wait(ni, lck);	\

@@ -3258,7 +3258,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 		}
 		lck_mtx_unlock(&ni->attr_nis_lock);
 	}
-	lck_mtx_lock(&ntfs_inode_hash_lock);
+	mtx_lock(&ntfs_inode_hash_lock);
 	NInoSetReclaim(ni);
 	/*
 	 * If the inode has been deleted then it has been removed from the ntfs
@@ -3273,7 +3273,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 	 * code path, too.
 	 */
 	NInoClearAllocLocked(ni);
-	lck_mtx_unlock(&ntfs_inode_hash_lock);
+	mtx_unlock(&ntfs_inode_hash_lock);
 	/* In case someone is waiting on the inode do a wakeup. */
 	ntfs_inode_wakeup(ni);
 	/* Detach the ntfs inode from its vnode, if there is one. */

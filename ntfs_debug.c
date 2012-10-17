@@ -68,7 +68,7 @@ SYSCTL_INT(_vfs_generic_ntfs, OID_AUTO, debug_messages, CTLFLAG_RW,
  * unload time.
  */
 static char ntfs_err_buf[1024];
-static lck_spin_t ntfs_err_buf_lock;
+static struct mtx ntfs_err_buf_lock;
 
 /**
  * ntfs_debug_init - initialize debugging for ntfs
@@ -81,7 +81,7 @@ static lck_spin_t ntfs_err_buf_lock;
  */
 void ntfs_debug_init(void)
 {
-	lck_spin_init(&ntfs_err_buf_lock, ntfs_lock_grp, ntfs_lock_attr);
+	mtx_init(&ntfs_err_buf_lock, "ntfs err buf lock", NULL, MTX_SPIN);
 #ifdef DEBUG
 	/* Register our sysctl. */
 	sysctl_register_oid(&sysctl__vfs_generic_ntfs);
@@ -105,7 +105,7 @@ void ntfs_debug_deinit(void)
 	sysctl_unregister_oid(&sysctl__vfs_generic_ntfs_debug_messages);
 	sysctl_unregister_oid(&sysctl__vfs_generic_ntfs);
 #endif
-	lck_spin_destroy(&ntfs_err_buf_lock, ntfs_lock_grp);
+	mtx_destroy(&ntfs_err_buf_lock);
 }
 
 /**
@@ -135,7 +135,7 @@ void __ntfs_warning(const char *function,
 
 	if (function)
 		flen = strlen(function);
-	lck_spin_lock(&ntfs_err_buf_lock);
+	mtx_lock_spin(&ntfs_err_buf_lock);
 	va_start(args, fmt);
 	vsnprintf(ntfs_err_buf, sizeof(ntfs_err_buf), fmt, args);
 	va_end(args);
@@ -149,7 +149,7 @@ void __ntfs_warning(const char *function,
 #ifdef DEBUG
 	OSReportWithBacktrace("");
 #endif
-	lck_spin_unlock(&ntfs_err_buf_lock);
+	mtx_unlock_spin(&ntfs_err_buf_lock);
 }
 
 /**
@@ -179,7 +179,7 @@ void __ntfs_error(const char *function,
 
 	if (function)
 		flen = strlen(function);
-	lck_spin_lock(&ntfs_err_buf_lock);
+	mtx_lock_spin(&ntfs_err_buf_lock);
 	va_start(args, fmt);
 	vsnprintf(ntfs_err_buf, sizeof(ntfs_err_buf), fmt, args);
 	va_end(args);
@@ -193,7 +193,7 @@ void __ntfs_error(const char *function,
 #ifdef DEBUG
 	OSReportWithBacktrace("");
 #endif
-	lck_spin_unlock(&ntfs_err_buf_lock);
+	mtx_unlock_spin(&ntfs_err_buf_lock);
 }
 
 #ifdef DEBUG
@@ -220,13 +220,13 @@ void __ntfs_debug(const char *file, int line,
 			}
 		}
 	}
-	lck_spin_lock(&ntfs_err_buf_lock);
+	mtx_lock_spin(&ntfs_err_buf_lock);
 	va_start(args, fmt);
 	vsnprintf(ntfs_err_buf, sizeof(ntfs_err_buf), fmt, args);
 	va_end(args);
 	printf("NTFS-fs DEBUG (%s, %d): %s(): %s\n", filename ? filename : "",
 			line, function ? function : "", ntfs_err_buf);
-	lck_spin_unlock(&ntfs_err_buf_lock);
+	mtx_unlock_spin(&ntfs_err_buf_lock);
 }
 
 /**
