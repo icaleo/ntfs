@@ -47,17 +47,17 @@
 
 static inline u16 le16_to_cpu(le16 x)
 {
-	return (u16)(OSSwapLittleToHostInt16(x));
+	return (u16)(le16toh(x));
 }
 
 static inline u32 le32_to_cpu(le32 x)
 {
-	return (u32)(OSSwapLittleToHostInt32(x));
+	return (u32)(le32toh(x));
 }
 
 static inline u64 le64_to_cpu(le64 x)
 {
-	return (u64)(OSSwapLittleToHostInt64(x));
+	return (u64)(le64toh(x));
 }
 
 static inline u16 le16_to_cpup(le16 *x)
@@ -77,17 +77,17 @@ static inline u64 le64_to_cpup(le64 *x)
 
 static inline le16 cpu_to_le16(u16 x)
 {
-	return (le16)(OSSwapHostToLittleInt16(x));
+	return (le16)(htole16(x));
 }
 
 static inline le32 cpu_to_le32(u32 x)
 {
-	return (le32)(OSSwapHostToLittleInt32(x));
+	return (le32)(htole32(x));
 }
 
 static inline le64 cpu_to_le64(u64 x)
 {
-	return (le64)(OSSwapHostToLittleInt64(x));
+	return (le64)(htole64(x));
 }
 
 static inline le16 cpu_to_le16p(u16 *x)
@@ -173,23 +173,43 @@ static inline sle64 cpu_to_sle64p(s64 *x)
  * Constant endianness conversion defines.
  */
 
-#define const_le16_to_cpu(x) ((u16)(OSSwapLittleToHostConstInt16(((u16)(x)))))
-#define const_le32_to_cpu(x) ((u32)(OSSwapLittleToHostConstInt32(((u32)(x)))))
-#define const_le64_to_cpu(x) ((u64)(OSSwapLittleToHostConstInt64(((u64)(x)))))
+#define SwapConstInt16(x) \
+    ((__uint16_t)((((__uint16_t)(x) & 0xff00) >> 8) | \
+                (((__uint16_t)(x) & 0x00ff) << 8)))
+ 
+#define SwapConstInt32(x) \
+    ((__uint32_t)((((__uint32_t)(x) & 0xff000000) >> 24) | \
+                (((__uint32_t)(x) & 0x00ff0000) >>  8) | \
+                (((__uint32_t)(x) & 0x0000ff00) <<  8) | \
+                (((__uint32_t)(x) & 0x000000ff) << 24)))
 
-#define const_cpu_to_le16(x) ((le16)(OSSwapHostToLittleConstInt16(((u16)(x)))))
-#define const_cpu_to_le32(x) ((le32)(OSSwapHostToLittleConstInt32(((u32)(x)))))
-#define const_cpu_to_le64(x) ((le64)(OSSwapHostToLittleConstInt64(((u64)(x)))))
+#define SwapConstInt64(x) \
+    ((__uint64_t)((((__uint64_t)(x) & 0xff00000000000000ULL) >> 56) | \
+                (((__uint64_t)(x) & 0x00ff000000000000ULL) >> 40) | \
+                (((__uint64_t)(x) & 0x0000ff0000000000ULL) >> 24) | \
+                (((__uint64_t)(x) & 0x000000ff00000000ULL) >>  8) | \
+                (((__uint64_t)(x) & 0x00000000ff000000ULL) <<  8) | \
+                (((__uint64_t)(x) & 0x0000000000ff0000ULL) << 24) | \
+                (((__uint64_t)(x) & 0x000000000000ff00ULL) << 40) | \
+                (((__uint64_t)(x) & 0x00000000000000ffULL) << 56)))
 
-#define const_sle16_to_cpu(x) ((s16)(OSSwapLittleToHostConstInt16(((u16)(x)))))
-#define const_sle32_to_cpu(x) ((s32)(OSSwapLittleToHostConstInt32(((u32)(x)))))
-#define const_sle64_to_cpu(x) ((s64)(OSSwapLittleToHostConstInt64(((u64)(x)))))
+#define const_le16_to_cpu(x) ((u16)(SwapConstInt16(((u16)(x)))))
+#define const_le32_to_cpu(x) ((u32)(SwapConstInt32(((u32)(x)))))
+#define const_le64_to_cpu(x) ((u64)(SwapConstInt64(((u64)(x)))))
+
+#define const_cpu_to_le16(x) ((le16)(SwapConstInt16(((u16)(x)))))
+#define const_cpu_to_le32(x) ((le32)(SwapConstInt32(((u32)(x)))))
+#define const_cpu_to_le64(x) ((le64)(SwapConstInt64(((u64)(x)))))
+
+#define const_sle16_to_cpu(x) ((s16)(SwapConstInt16(((u16)(x)))))
+#define const_sle32_to_cpu(x) ((s32)(SwapConstInt32(((u32)(x)))))
+#define const_sle64_to_cpu(x) ((s64)(SwapConstInt64(((u64)(x)))))
 
 #define const_cpu_to_sle16(x)	\
-		((sle16)(OSSwapHostToLittleConstInt16(((u16)(x)))))
+		((sle16)(SwapConstInt16(((u16)(x)))))
 #define const_cpu_to_sle32(x)	\
-		((sle32)(OSSwapHostToLittleConstInt32(((u32)(x)))))
+		((sle32)(SwapConstInt32(((u32)(x)))))
 #define const_cpu_to_sle64(x)	\
-		((sle64)(OSSwapHostToLittleConstInt64(((u64)(x)))))
+		((sle64)(SwapConstInt64(((u64)(x)))))
 
 #endif /* !_BSD_NTFS_ENDIAN_H */
