@@ -375,11 +375,11 @@ static inline u32 NIno##flag(ntfs_inode *ni)				\
 }									\
 static inline void NInoSet##flag(ntfs_inode *ni)			\
 {									\
-	(void)OSBitOrAtomic((u32)1 << NI_##flag, (UInt32*)&ni->flags);	\
+	(void)OSBitOrAtomic((u32)1 << NI_##flag, (u32*)&ni->flags);	\
 }									\
 static inline void NInoClear##flag(ntfs_inode *ni)			\
 {									\
-	(void)OSBitAndAtomic(~((u32)1 << NI_##flag), (UInt32*)&ni->flags); \
+	(void)OSBitAndAtomic(~((u32)1 << NI_##flag), (u32*)&ni->flags); \
 }
 
 /*
@@ -389,12 +389,12 @@ static inline void NInoClear##flag(ntfs_inode *ni)			\
 static inline u32 NInoTestSet##flag(ntfs_inode *ni)			\
 {									\
 	return ((u32)OSBitOrAtomic((u32)1 << NI_##flag,			\
-			(UInt32*)&ni->flags) >> NI_##flag) & 1;		\
+			(u32*)&ni->flags) >> NI_##flag) & 1;		\
 }									\
 static inline u32 NInoTestClear##flag(ntfs_inode *ni)			\
 {									\
 	return ((u32)OSBitAndAtomic(~((u32)1 << NI_##flag),		\
-			(UInt32*)&ni->flags) >> NI_##flag) & 1;		\
+			(u32*)&ni->flags) >> NI_##flag) & 1;		\
 }
 
 /* Emit the ntfs inode bitops functions. */
@@ -404,7 +404,7 @@ DEFINE_NINO_BIT_OPS(Alloc)
 static inline void NInoClearAllocLocked(ntfs_inode *ni)
 {
 	(void)OSBitAndAtomic(~(((u32)1 << NI_Locked) | ((u32)1 << NI_Alloc)),
-			(UInt32*)&ni->flags);
+			(u32*)&ni->flags);
 }
 
 DEFINE_NINO_BIT_OPS(Deleted)
