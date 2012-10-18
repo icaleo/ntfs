@@ -3407,7 +3407,6 @@ void ntfs_do_postponed_release(ntfs_volume *vol)
 	mtx_destroy(&vol->inodes_lock);
 	/* Finally, free the ntfs volume. */
 	free(vol, M_NTFS);
-	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
 }
 
 /**
@@ -3610,7 +3609,6 @@ no_mft:
 	free(vol, M_NTFS);
 unload:
 	err = 0;
-	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
 abort:
 	ntfs_debug("Done.");
 	return err;
@@ -3904,7 +3902,6 @@ static errno_t ntfs_remount(mount_t mp,
 EROFS_exit:
 	err = EROFS;
 err_exit:
-	OSKextReleaseKextWithLoadTag(OSKextGetCurrentLoadTag());
 	return err;
 }
 
