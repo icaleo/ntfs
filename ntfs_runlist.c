@@ -2164,10 +2164,10 @@ errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *runlist, u8 *dst,
 
 			ntfs_debug("Reading block 0x%llx.",
 					(unsigned long long)block);
-			err = buf_meta_bread(dev_vn, block, block_size, NOCRED,
+			err = bread(dev_vn, block, block_size, NOCRED,
 					&buf);
 			if (err) {
-				ntfs_error(vol->mp, "buf_meta_bread() failed "
+				ntfs_error(vol->mp, "bread() failed "
 						"(error %d).  Cannot read "
 						"data.", (int)err);
 				goto err;

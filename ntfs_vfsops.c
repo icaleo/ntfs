@@ -684,7 +684,7 @@ static errno_t ntfs_mft_inode_get(ntfs_volume *vol)
 	for (u = 0; u < nr_blocks; u++, block++) {
 		u8 *src;
 
-		err = buf_meta_bread(dev_vn, block, block_size, NOCRED, &buf);
+		err = bread(dev_vn, block, block_size, NOCRED, &buf);
 		/*
 		 * We set the B_NOCACHE flag on the buffer(s), thus effectively
 		 * invalidating them when we release them.  This is needed
@@ -1371,7 +1371,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 	sx_slock(&ni->lock);
 	for (i = 0; i < nr_mirr_recs; i++) {
 		/* Get the next $MFTMirr record. */
-		err = buf_meta_bread(ni->vn, i, rec_size, NOCRED, &buf);
+		err = bread(ni->vn, i, rec_size, NOCRED, &buf);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to read $MFTMirr record "
 					"%d (error %d).", i, err);
@@ -1448,7 +1448,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		unsigned bytes;
 
 		/* Get the current $MFT record. */
-		err = buf_meta_bread(ni->vn, i, rec_size, NOCRED, &buf);
+		err = bread(ni->vn, i, rec_size, NOCRED, &buf);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to read $MFT record %d "
 					"(error %d).", i, err);

@@ -143,10 +143,10 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 	 * Similarly we know if the buffer was already dirty or not by checking
 	 * buf_flags(buf) & B_DELWRI.
 	 */
-	ntfs_debug("Calling buf_meta_bread().");
-	err = buf_meta_bread(mft_ni->vn, ni->mft_no, vol->mft_record_size,
+	ntfs_debug("Calling bread().");
+	err = bread(mft_ni->vn, ni->mft_no, vol->mft_record_size,
 			NOCRED, &buf);
-	ntfs_debug("After buf_meta_bread().");
+	ntfs_debug("After bread().");
 	if (err) {
 		ntfs_error(vol->mp, "Failed to read buffer of mft record "
 				"0x%llx (error %d).",
@@ -1712,7 +1712,7 @@ static errno_t ntfs_mft_record_format(ntfs_volume *vol, const s64 mft_no,
 		return ENOENT;
 	}
 	/* Read and map the buffer containing the mft record. */
-	err = buf_meta_bread(mft_ni->vn, mft_no, vol->mft_record_size, NOCRED,
+	err = bread(mft_ni->vn, mft_no, vol->mft_record_size, NOCRED,
 			&buf);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to read buffer of mft record "
@@ -2423,7 +2423,7 @@ mft_rec_already_initialized:
 	 *
 	 * Read and map the buffer containing the mft record.
 	 */
-	err = buf_meta_bread(mft_ni->vn, bit, vol->mft_record_size, NOCRED,
+	err = bread(mft_ni->vn, bit, vol->mft_record_size, NOCRED,
 			&buf);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to read buffer of mft record "
@@ -2935,7 +2935,7 @@ undo_data_init:
 	goto undo_mftbmp_alloc_locked;
 free_undo_mftbmp_alloc:
 	sx_slock(&mft_ni->lock);
-	err2 = buf_meta_bread(mft_ni->vn, bit, vol->mft_record_size, NOCRED,
+	err2 = bread(mft_ni->vn, bit, vol->mft_record_size, NOCRED,
 			&buf);
 	if (err2) {
 		ntfs_error(vol->mp, "Failed to re-read buffer of mft record "
