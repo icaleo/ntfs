@@ -375,11 +375,11 @@ static inline u32 NIno##flag(ntfs_inode *ni)				\
 }									\
 static inline void NInoSet##flag(ntfs_inode *ni)			\
 {									\
-	(void)OSBitOrAtomic((u32)1 << NI_##flag, (u32*)&ni->flags);	\
+	atomic_set_32((u32*)&ni->flags, (u32)1 << NI_##flag);		\
 }									\
 static inline void NInoClear##flag(ntfs_inode *ni)			\
 {									\
-	(void)OSBitAndAtomic(~((u32)1 << NI_##flag), (u32*)&ni->flags); \
+	atomic_clear_32((u32*)&ni->flags, (u32)1 << NI_##flag);		\
 }
 
 /*
@@ -388,13 +388,22 @@ static inline void NInoClear##flag(ntfs_inode *ni)			\
 #define DEFINE_NINO_TEST_AND_SET_BIT_OPS(flag)				\
 static inline u32 NInoTestSet##flag(ntfs_inode *ni)			\
 {									\
-	return ((u32)OSBitOrAtomic((u32)1 << NI_##flag,			\
-			(u32*)&ni->flags) >> NI_##flag) & 1;		\
+			if (!((ni->flags >> NI_##flag) & 1)) {		\
+				atomic_set_32((u32*)&ni->flags,		\
+					(u32)1 << NI_##flag);		\
+				return 0;				\
+			} else						\
+				return 1;				\
 }									\
 static inline u32 NInoTestClear##flag(ntfs_inode *ni)			\
 {									\
-	return ((u32)OSBitAndAtomic(~((u32)1 << NI_##flag),		\
-			(u32*)&ni->flags) >> NI_##flag) & 1;		\
+			if ((ni->flags >> NI_##flag) & 1) {		\
+				atomic_clear_32((u32*)&ni->flags,	\
+					(u32)1 << NI_##flag);		\
+				return 1;				\
+			} else						\
+				return 0;				\
+									\
 }
 
 /* Emit the ntfs inode bitops functions. */
@@ -403,8 +412,7 @@ DEFINE_NINO_BIT_OPS(Alloc)
 
 static inline void NInoClearAllocLocked(ntfs_inode *ni)
 {
-	(void)OSBitAndAtomic(~(((u32)1 << NI_Locked) | ((u32)1 << NI_Alloc)),
-			(u32*)&ni->flags);
+	atomic_clear_32((u32*)&ni->flags, ((u32)1 << NI_Locked) | ((u32)1 << NI_Alloc));
 }
 
 DEFINE_NINO_BIT_OPS(Deleted)

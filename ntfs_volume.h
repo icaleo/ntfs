@@ -234,11 +234,11 @@ static inline u32 NVol##flag(ntfs_volume *vol)				\
 }									\
 static inline void NVolSet##flag(ntfs_volume *vol)			\
 {									\
-	(void)OSBitOrAtomic((u32)1 << NV_##flag, (u32*)&vol->flags);	\
+	atomic_set_32((u32*)&vol->flags, (u32)1 << NV_##flag);		\
 }									\
 static inline void NVolClear##flag(ntfs_volume *vol)			\
 {									\
-	(void)OSBitAndAtomic(~((u32)1 << NV_##flag), (u32*)&vol->flags); \
+	atomic_clear_32((u32*)&vol->flags, (u32)1 << NV_##flag);	\
 }
 
 /* Define the ntfs volume bitops functions. */
