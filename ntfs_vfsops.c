@@ -5347,8 +5347,6 @@ static struct vnodeopv_desc *ntfs_vnodeopv_desc_list[1] = {
 /* A tag to allow allocation and freeing of memory. */
 MALLOC_DEFINE(M_NTFS, "ntfs", "NTFS structures");
 
-static vfstable_t ntfs_vfstable;
-
 static int ntfs_init(struct vfsconf *vcp)
 {
 	errno_t err;
