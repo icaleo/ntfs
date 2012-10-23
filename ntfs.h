@@ -77,13 +77,6 @@ typedef unsigned int     lck_rw_type_t;
  * END typedefs from OS X headers
  */
 
-/* return a pointer to the RO vfs_statfs associated with mount_t */
-struct statfs * 
-vfs_statfs(mount_t mp)
-{
-         return(&mp->mnt_stat);
-}
-
 /**
  * NTFS_MP - return the NTFS volume given a vfs mount
  * @mp:		VFS mount
@@ -93,11 +86,6 @@ vfs_statfs(mount_t mp)
 static inline ntfs_volume *NTFS_MP(mount_t mp)
 {
 	return (ntfs_volume*)vfs_fsprivate(mp);
-}
-
-void * vfs_fsprivate(mount_t mp)
-{
-         return(mp->mnt_data);
 }
 
 __private_extern__ void ntfs_do_postponed_release(ntfs_volume *vol);
