@@ -60,8 +60,6 @@
 #include "ntfs_vnops.h"
 #include "ntfs_volume.h"
 
-/* Global ntfs vnode operations. */
-vnop_t **ntfs_vnodeop_p;
 
 /**
  * ntfs_cluster_iodone - complete i/o on a memory region
@@ -1447,11 +1445,10 @@ rm_err:
 		 * create, simply look up the inode and return that.
 		 */
 		if (va->va_type == VREG && !(va->va_vaflags & VA_EXCLUSIVE)) {
-			struct vnop_lookup_args la;
+			struct vop_cachedlookup_args la;
 
 			cn->cn_nameiop = LOOKUP;
-			la = (struct vnop_lookup_args) {
-				.a_desc = &vnop_lookup_desc,
+			la = (struct vop_cachedlookup_args) {
 				.a_dvp = dir_vn,
 				.a_vpp = vn,
 				.a_cnp = cn,
@@ -10858,79 +10855,57 @@ static int ntfs_vnop_removenamedstream(struct vnop_removenamedstream_args *a)
 	return 0;
 }
 
-static struct vnodeopv_entry_desc ntfs_vnodeop_entries[] = {
-	/*
-	 * Set vn_default_error() to be our default vnop, thus any vnops we do
-	 * not specify (or specify as NULL) will be set to it and this function
-	 * just returns ENOTSUP.
-	 */
-	{ &vnop_default_desc,		(vnop_t*)vn_default_error },
-	{ &vnop_strategy_desc,		(vnop_t*)ntfs_vnop_strategy },
+struct vop_vector ntfs_vnodeops = {
+	.vop_default =			&default_vnodeops,
+	
+	.vop_strategy =			ntfs_vnop_strategy,
 	/*
 	 * vn_bwrite() is a simple wrapper for buf_bwrite() which in turn uses
 	 * VNOP_STRATEGY() and hence ntfs_vnop_strategy() to do the i/o and the
 	 * latter handles all NTFS specifics thus we can simply use the generic
 	 * vn_bwrite() for our VNOP_BWRITE() method.
 	 */
-	{ &vnop_bwrite_desc,		(vnop_t*)vn_bwrite },
-	{ &vnop_lookup_desc,		(vnop_t*)ntfs_vnop_lookup },
-	{ &vnop_create_desc,		(vnop_t*)ntfs_vnop_create },
-	{ &vnop_mknod_desc,		(vnop_t*)ntfs_vnop_mknod },
-	{ &vnop_open_desc,		(vnop_t*)ntfs_vnop_open },
-	{ &vnop_close_desc,		(vnop_t*)ntfs_vnop_close },
-	{ &vnop_access_desc,		(vnop_t*)ntfs_vnop_access },
-	{ &vnop_getattr_desc,		(vnop_t*)ntfs_vnop_getattr },
-	{ &vnop_setattr_desc,		(vnop_t*)ntfs_vnop_setattr },
-	{ &vnop_read_desc,		(vnop_t*)ntfs_vnop_read },
-	{ &vnop_write_desc,		(vnop_t*)ntfs_vnop_write },
-	{ &vnop_ioctl_desc,		(vnop_t*)ntfs_vnop_ioctl },
-	{ &vnop_select_desc,		(vnop_t*)ntfs_vnop_select },
-	{ &vnop_exchange_desc,		(vnop_t*)ntfs_vnop_exchange },
-	/* Let the VFS deal with revoking a vnode. */
-	{ &vnop_revoke_desc,		(vnop_t*)nop_revoke },
-	{ &vnop_mmap_desc,		(vnop_t*)ntfs_vnop_mmap },
-	{ &vnop_mnomap_desc,		(vnop_t*)ntfs_vnop_mnomap },
-	{ &vnop_fsync_desc,		(vnop_t*)ntfs_vnop_fsync },
-	{ &vnop_remove_desc,		(vnop_t*)ntfs_vnop_remove },
-	{ &vnop_link_desc,		(vnop_t*)ntfs_vnop_link },
-	{ &vnop_rename_desc,		(vnop_t*)ntfs_vnop_rename },
-	{ &vnop_mkdir_desc,		(vnop_t*)ntfs_vnop_mkdir },
-	{ &vnop_rmdir_desc,		(vnop_t*)ntfs_vnop_rmdir },
-	{ &vnop_symlink_desc,		(vnop_t*)ntfs_vnop_symlink },
-	{ &vnop_readdir_desc,		(vnop_t*)ntfs_vnop_readdir },
-	{ &vnop_readdirattr_desc, 	(vnop_t*)ntfs_vnop_readdirattr },
-	{ &vnop_readlink_desc,		(vnop_t*)ntfs_vnop_readlink },
-	{ &vnop_inactive_desc,		(vnop_t*)ntfs_vnop_inactive },
-	{ &vnop_reclaim_desc,		(vnop_t*)ntfs_vnop_reclaim },
-	{ &vnop_pathconf_desc,		(vnop_t*)ntfs_vnop_pathconf },
-	/*
-	 * Let the VFS deal with advisory locking for us, so our advlock method
-	 * should never get called and if it were to get called for some
-	 * reason, we make sure to return error (ENOTSUP).
-	 */
-	{ &vnop_advlock_desc,		(vnop_t*)err_advlock },
-	{ &vnop_allocate_desc,		(vnop_t*)ntfs_vnop_allocate },
-	{ &vnop_pagein_desc,		(vnop_t*)ntfs_vnop_pagein },
-	{ &vnop_pageout_desc,		(vnop_t*)ntfs_vnop_pageout },
-	{ &vnop_searchfs_desc,		(vnop_t*)ntfs_vnop_searchfs },
-	/*
-	 * Nothing supports copyfile in current xnu and it is not documented so
-	 * we do not support it either.
-	 */
-	{ &vnop_copyfile_desc,		(vnop_t*)err_copyfile },
-	{ &vnop_getxattr_desc,		(vnop_t*)ntfs_vnop_getxattr },
-	{ &vnop_setxattr_desc,		(vnop_t*)ntfs_vnop_setxattr },
-	{ &vnop_removexattr_desc,	(vnop_t*)ntfs_vnop_removexattr },
-	{ &vnop_listxattr_desc,		(vnop_t*)ntfs_vnop_listxattr },
-	{ &vnop_blktooff_desc,		(vnop_t*)ntfs_vnop_blktooff },
-	{ &vnop_offtoblk_desc,		(vnop_t*)ntfs_vnop_offtoblk },
-	{ &vnop_blockmap_desc,		(vnop_t*)ntfs_vnop_blockmap },
-	{ &vnop_getnamedstream_desc,	(vnop_t*)ntfs_vnop_getnamedstream },
-	{ &vnop_makenamedstream_desc,	(vnop_t*)ntfs_vnop_makenamedstream },
-	{ &vnop_removenamedstream_desc,	(vnop_t*)ntfs_vnop_removenamedstream },
-	{ NULL,				(vnop_t*)NULL }
-};
-
-struct vnodeopv_desc ntfs_vnodeopv_desc = {
-	&ntfs_vnodeop_p, ntfs_vnodeop_entries
+	.vop_bwrite =			vn_bwrite,
+	.vop_lookup =			ntfs_vnop_lookup,
+	.vop_create =			ntfs_vnop_create,
+	.vop_mknod =			ntfs_vnop_mknod,
+	.vop_open =			ntfs_vnop_open,
+	.vop_close =			ntfs_vnop_close,
+	.vop_access =			ntfs_vnop_access,
+	.vop_getattr =			ntfs_vnop_getattr,
+	.vop_setattr =			ntfs_vnop_setattr,
+	.vop_read =			ntfs_vnop_read,
+	.vop_write =			ntfs_vnop_write,
+	.vop_ioctl =			ntfs_vnop_ioctl,
+	.vop_select =			ntfs_vnop_select,
+	.vop_exchange =			ntfs_vnop_exchange,
+	.vop_mmap =			ntfs_vnop_mmap,
+	.vop_mnomap =			ntfs_vnop_mnomap,
+	.vop_fsync =			ntfs_vnop_fsync,
+	.vop_remove =			ntfs_vnop_remove,
+	.vop_link =			ntfs_vnop_link,
+	.vop_rename =			ntfs_vnop_rename,
+	.vop_mkdir =			ntfs_vnop_mkdir,
+	.vop_rmdir =			ntfs_vnop_rmdir,
+	.vop_symlink =			ntfs_vnop_symlink,
+	.vop_readdir =			ntfs_vnop_readdir,
+	.vop_readdirattr =		ntfs_vnop_readdirattr,
+	.vop_readlink =			ntfs_vnop_readlink,
+	.vop_inactive =			ntfs_vnop_inactive,
+	.vop_reclaim =			ntfs_vnop_reclaim,
+	.vop_pathconf =			ntfs_vnop_pathconf,
+	.vop_allocate =			ntfs_vnop_allocate,
+	.vop_pagein =			ntfs_vnop_pagein,
+	.vop_pageout =			ntfs_vnop_pageout,
+	.vop_searchfs =			ntfs_vnop_searchfs,
+	.vop_getxattr =			ntfs_vnop_getxattr,
+	.vop_setxattr =			ntfs_vnop_setxattr,
+	.vop_removexattr =		ntfs_vnop_removexattr,
+	.vop_listxattr =		ntfs_vnop_listxattr,
+	.vop_blktooff =			ntfs_vnop_blktooff,
+	.vop_offtoblk =			ntfs_vnop_offtoblk,
+	.vop_blockmap =			ntfs_vnop_blockmap,
+	.vop_getnamedstream =		ntfs_vnop_getnamedstream,
+	.vop_makenamedstream =		ntfs_vnop_makenamedstream,
+	.vop_removenamedstream =	ntfs_vnop_removenamedstream,
 };

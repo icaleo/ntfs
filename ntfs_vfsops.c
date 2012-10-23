@@ -5335,9 +5335,6 @@ static int ntfs_setattr(struct mount *mp, struct vfs_attr *fsa,
 	return 0;
 }
 
-static struct vnodeopv_desc *ntfs_vnodeopv_desc_list[1] = {
-	&ntfs_vnodeopv_desc,
-};
 
 /* A tag to allow allocation and freeing of memory. */
 MALLOC_DEFINE(M_NTFS, "ntfs", "NTFS structures");
