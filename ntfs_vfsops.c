@@ -3717,7 +3717,6 @@ err:
  * ntfs_sync - sync a mounted volume to disk
  * @mp:		mount point of ntfs file system
  * @waitfor:	if MNT_WAIT wait fo i/o to complete
- * @context:	vfs context
  *
  * The VFS calls this via VFS_SYNC() when it wants to sync all cached data of
  * the mounted ntfs volume described by the mount @mp.
@@ -3729,7 +3728,7 @@ err:
  * Note this function is only called for r/w mounted volumes so no need to
  * check if the volume is read-only.
  */
-static int ntfs_sync(struct mount *mp, int waitfor, vfs_context_t context)
+static int ntfs_sync(struct mount *mp, int waitfor)
 {
 	ntfs_volume *vol = NTFS_MP(mp);
 	struct ntfs_sync_args args;
@@ -4321,7 +4320,6 @@ err:
  * ntfs_root - get the vnode of the root directory of an ntfs file system
  * @mp:		mount point of ntfs file system
  * @vpp:	destination pointer for the obtained file system root vnode
- * @context:	vfs context
  *
  * The VFS calls this via VFS_ROOT() when it wants to have the root directory
  * of a mounted ntfs volume.  We already have the root vnode/inode due to
@@ -4334,8 +4332,7 @@ err:
  * checkdirs() which is called after ntfs_mount() but before VFS_START() (which
  * we do not implement).
  */
-static int ntfs_root(mount_t mp, struct vnode **vpp,
-		vfs_context_t context __unused)
+static int ntfs_root(mount_t mp, int flags, struct vnode **vpp)
 {
 	ntfs_volume *vol = NTFS_MP(mp);
 	vnode_t vn;
@@ -4369,7 +4366,6 @@ static int ntfs_root(mount_t mp, struct vnode **vpp,
  * @mp:		mount point of ntfs file system
  * @ino:	inode number / mft record number to obtain
  * @vpp:	destination pointer for the obtained vnode
- * @context:	vfs context
  *
  * Volfs and other strange places where no further path or name context is
  * available call this via VFS_VGET() to obtain the vnode with the inode number
@@ -4384,8 +4380,7 @@ static int ntfs_root(mount_t mp, struct vnode **vpp,
  * but not for example the vnode of a named stream or other attribute.  Perhaps
  * this does not matter for volfs in which case everything is fine...
  */
-static int ntfs_vget(mount_t mp, ino64_t ino, struct vnode **vpp,
-		vfs_context_t context __unused)
+static int ntfs_vget(mount_t mp, ino64_t ino, int flags, struct vnode **vpp)
 {
 	ntfs_inode *ni;
 	errno_t err;
