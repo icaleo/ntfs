@@ -38,12 +38,29 @@
 /* return a pointer to the RO vfs_statfs associated with mount_t */
 struct statfs * vfs_statfs(mount_t mp)
 {
-         return(&mp->mnt_stat);
+        return(&mp->mnt_stat);
 }
-
 
 /* return a pointer to fs private data */
 void * vfs_fsprivate(mount_t mp)
 {
-         return(mp->mnt_data);
+        return(mp->mnt_data);
+}
+
+/* is vnode_t a regular file */
+int vnode_isreg(vnode_t vp)
+{
+        return ((vp->v_type == VREG)? 1 : 0);
+}
+
+/* is vnode_t a char device? */
+int vnode_ischr(vnode_t vp)
+{
+        return ((vp->v_type == VCHR)? 1 : 0);
+}
+
+/* is vnode_t a block device? */
+int vnode_isblk(vnode_t vp)
+{
+        return ((vp->v_type == VBLK)? 1 : 0);
 }
