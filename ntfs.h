@@ -53,30 +53,6 @@ __private_extern__ OSMallocTag ntfs_malloc_tag;
 
 #include "ntfs_volume.h"
 
-/*
- * BEGIN typedefs from OS X headers
- */
-typedef int errno_t;
-
-typedef struct mount * mount_t;
-
-typedef struct vnode * vnode_t;
-
-typedef struct buf * buf_t;
-
-typedef struct uio * uio_t;
-
-typedef char * caddr_t;        /* address of a (signed) char */
-
-typedef unsigned int     lck_rw_type_t;
- 
-#define LCK_RW_TYPE_SHARED                      0x01
-#define LCK_RW_TYPE_EXCLUSIVE           0x02
-
-/*
- * END typedefs from OS X headers
- */
-
 /**
  * NTFS_MP - return the NTFS volume given a vfs mount
  * @mp:		VFS mount
