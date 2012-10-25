@@ -4058,6 +4058,8 @@ static int ntfs_mountfs(devvp, mp, td)
 		.mp = mp,
 		.dev = dev,
 		.dev_vn = devvp,
+		.cp = cp,
+		.bo = &devvp->v_bufobj,
 		/*
 		 * Default is group and other have read-only access to files
 		 * and directories while owner has full access.  Everyone gets

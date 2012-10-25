@@ -379,15 +379,15 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 	mtx_lock_spin(&ni->size_lock);
 	max_end_io = ni->initialized_size;
 	do_fixup = FALSE;
-	if (b_flags & B_READ) {
+	if ( bp->b_iocmd == BIO_READ ) {
 		if (ofs >= max_end_io) {
 			if (max_end_io > ni->data_size)
 				panic("%s() initialized_size > data_size\n",
 						__FUNCTION__);
 			if (ofs < ni->data_size) {
 				mtx_unlock_spin(&ni->size_lock);
-				buf_clear(buf);
-				buf_biodone(buf);
+				clrbuf(buf);
+				biodone(buf);
 				ntfs_debug("Read past initialized size.  "
 						"Clearing buffer.");
 				return 0;
@@ -401,7 +401,7 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 		/* I/o is out of range.  This should never happen. */
 		ntfs_error(vol->mp, "Trying to %s buffer for $MFT/$DATA which "
 				"is out of range, aborting.",
-				b_flags & B_READ ? "read" : "write");
+				bp->b_iocmd == BIO_READ ? "read" : "write");
 		err = EIO;
 		goto err;
 	}
@@ -414,7 +414,7 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 	 * Note B_WRITE is a pseudo flag and cannot be used for checking thus
 	 * check that B_READ is not set which implies it is a write.
 	 */
-	if (!(b_flags & B_READ)) {
+	if ( bp->b_iocmd == BIO_WRITE ) {
 		NTFS_RECORD *rec;
 		NTFS_RECORD_TYPE magic;
 		BOOL need_mirr_sync;
@@ -498,12 +498,11 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 	 * safe to have the MST fixups applied whilst i/o is in flight.
 	 */
 	if (do_fixup) {
-		buf_setfilter(buf, ntfs_buf_iodone, NULL, &old_iodone,
-				&old_transact);
-		if (old_iodone || old_transact)
+		if ( buf->b_iodone )
 			panic("%s(): Buffer for $MFT/$DATA already had an i/o "
 					"completion handler assigned!\n",
 					__FUNCTION__);
+		buf->b_iodone = ntfs_buf_iodone;
 	}
 	/*
 	 * Everything is set up.  Pass the i/o onto the buffer layer.
@@ -512,15 +511,19 @@ static int ntfs_vnop_strategy(struct vnop_strategy_args *a)
 	 * will remove the mst fixups.
 	 */
 done:
-	return buf_strategy(vol->dev_vn, a);
+	buf->b_iooffset = dbtob(buf->b_blkno);
+        bo = vol->bo;
+        BO_STRATEGY(bo, bp);
+        return (0);
 unm_err:
 	err2 = buf_unmap(buf);
 	if (err2)
 		ntfs_error(vol->mp, "Failed to unmap buffer in error code "
 				"path (error %d).", err2);
 err:
-	buf_seterror(buf, err);
-	buf_biodone(buf);
+	bp->b_error = err;
+	bp->b_ioflags |= BIO_ERROR;
+	biodone(buf);
 	return err;
 }
 

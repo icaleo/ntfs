@@ -64,3 +64,24 @@ int vnode_isblk(vnode_t vp)
 {
         return ((vp->v_type == VBLK)? 1 : 0);
 }
+
+uint32_t buf_flags(buf_t bp) 
+{
+        return ((bp->b_flags));
+}
+
+daddr64_t buf_lblkno(buf_t bp)
+{
+        return (bp->b_lblkno);
+}
+
+errno_t buf_map(buf_t bp, caddr_t *io_addr)
+{
+	*io_addr = (caddr_t)bp->b_data;
+	return (0);
+}
+
+errno_t buf_unmap(buf_t bp)
+{
+	return (0);
+}
