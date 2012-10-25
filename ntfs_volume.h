@@ -57,7 +57,7 @@ struct _ntfs_volume {
 	dev_t dev;			/* The device number of the volume. */
 	vnode_t dev_vn;			/* The device vnode of the volume. */
 	struct g_consumer *cp;
-        struct bufobj  *bo;
+	struct bufobj  *bo;
 	LCN nr_blocks;			/* Number of NTFS_BLOCK_SIZE bytes
 					   sized blocks on the device. */
 	/* Configuration provided by user at mount time. */
