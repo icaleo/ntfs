@@ -10862,13 +10862,6 @@ struct vop_vector ntfs_vnodeops = {
 	.vop_default =			&default_vnodeops,
 	
 	.vop_strategy =			ntfs_vnop_strategy,
-	/*
-	 * vn_bwrite() is a simple wrapper for buf_bwrite() which in turn uses
-	 * VNOP_STRATEGY() and hence ntfs_vnop_strategy() to do the i/o and the
-	 * latter handles all NTFS specifics thus we can simply use the generic
-	 * vn_bwrite() for our VNOP_BWRITE() method.
-	 */
-	.vop_bwrite =			vn_bwrite,
 	.vop_lookup =			ntfs_vnop_lookup,
 	.vop_create =			ntfs_vnop_create,
 	.vop_mknod =			ntfs_vnop_mknod,
