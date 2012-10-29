@@ -535,7 +535,6 @@ err:
  *	vnode_t a_dvp;			directory vnode in which to search
  *	vnode_t *a_vpp;			destination pointer for the found vnode
  *	struct componentname *a_cnp;	name to find in the directory vnode
- *	vfs_context_t a_context;
  *
  * In short, ntfs_vnop_lookup() looks for the vnode represented by the name
  * @a->a_cnp in the directory vnode @a->a_dvp and if found returns the vnode in
@@ -642,7 +641,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	 * lookup failed.  In this case we will automatically fall through and
 	 * do the right thing during the real lookup.
 	 */
-	err = cache_lookup(dir_ni->vn, &vn, cn);
+	err = cache_lookup(dir_ni->vn, &vn, cn, NULL, NULL);
 	if (err) {
 		if (err == -1) {
 			ni = NTFS_I(vn);
