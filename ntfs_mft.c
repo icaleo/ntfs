@@ -106,9 +106,13 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 				"this one).");
 		return EINVAL;
 	}
-	/* Get an iocount reference on the $MFT vnode. */
-	err = vnode_get(mft_ni->vn);
-	if (err) {
+	/* 
+	 * Hold the $MFT vnode.
+	 * FIXME: Next If statement always false because of replacing
+	 * vnode_get() with vhold()
+ 	 */
+	vhold(mft_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 		return err;
 	}
@@ -195,7 +199,7 @@ err:
 	 */
 	if (!mft_is_locked)
 		sx_sunlock(&mft_ni->lock);
-	(void)vnode_put(mft_ni->vn);
+	vdrop(mft_ni->vn);
 	return err;
 }
 
@@ -241,7 +245,7 @@ void ntfs_mft_record_unmap(ntfs_inode *ni)
 	 * Release the iocount reference on the $MFT vnode.  We can ignore the
 	 * return value as it always is zero.
 	 */
-	(void)vnode_put(mft_ni->vn);
+	vdrop(mft_ni->vn);
 	ntfs_debug("Done.");
 }
 
@@ -437,9 +441,13 @@ errno_t ntfs_mft_record_sync(ntfs_inode *ni)
 		ntfs_warning(vol->mp, "$MFT inode is missing from volume.");
 		return ENOTSUP;
 	}
-	/* Get an iocount reference on the $MFT vnode. */
-	err = vnode_get(mft_ni->vn);
-	if (err) {
+        /* 
+         * Hold the $MFT vnode.
+         * FIXME: Next If statement always false because of replacing
+         * vnode_get() with vhold()
+         */
+	vhold(mft_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 		return err;
 	}
@@ -451,7 +459,7 @@ errno_t ntfs_mft_record_sync(ntfs_inode *ni)
 	buf = buf_getblk(mft_ni->vn, ni->mft_no, vol->mft_record_size, 0, 0,
 			BLK_META | BLK_ONLYVALID);
 	sx_sunlock(&mft_ni->lock);
-	(void)vnode_put(mft_ni->vn);
+	vdrop(mft_ni->vn);
 	if (!buf) {
 		ntfs_debug("Mft record 0x%llx is not in cache, nothing to do.",
 				(unsigned long long)ni->mft_no);
@@ -520,8 +528,12 @@ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol, const s64 rec_no,
 	sx_slock(&mirr_ni->lock);
 	if (rec_no >= vol->mftmirr_size)
 		panic("%s(): rec_no >= vol->mftmirr_size\n", __FUNCTION__);
-	err = vnode_get(mirr_vn);
-	if (err) {
+	/*
+	 * FIXME: Next If statement always false because of replacing
+	 * vnode_get() with vhold() 
+ 	 */
+	vhold(mirr_vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for mft mirror.");
 		goto err;
 	}
@@ -584,7 +596,7 @@ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol, const s64 rec_no,
 				"record %lld (error %d).",
 				(unsigned long long)rec_no, err);
 put:
-	(void)vnode_put(mirr_vn);
+	vdrop(mirr_vn);
 err:
 	sx_sunlock(&mirr_ni->lock);
 	if (!err)
@@ -832,8 +844,12 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	ntfs_debug("Last lcn of mft bitmap attribute is 0x%llx.",
 			(unsigned long long)lcn);
 	sx_xlock(&vol->lcnbmp_lock);
-	err = vnode_get(lcnbmp_ni->vn);
-	if (err) {
+	/*
+	 * FIXME: Next If statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */
+	vhold(lcnbmp_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
 		sx_xunlock(&vol->lcnbmp_lock);
 		sx_xunlock(&mftbmp_ni->rl.lock);
@@ -850,7 +866,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 			TRUE);
 	if (err) {
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_ni->vn);
+		vdrop(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		sx_xunlock(&mftbmp_ni->rl.lock);
 		ntfs_error(vol->mp, "Failed to read from lcn bitmap.");
@@ -866,7 +882,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 			vol->nr_free_clusters = 0;
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, TRUE);
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_ni->vn);
+		vdrop(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		/* Update the mft bitmap runlist. */
 		rl->length++;
@@ -877,7 +893,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 
 		ntfs_page_unmap(lcnbmp_ni, upl, pl, FALSE);
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_ni->vn);
+		vdrop(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		/* Allocate a cluster from the DATA_ZONE. */
 		runlist.rl = NULL;
@@ -2070,19 +2086,27 @@ errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
 	 */
 	mft_ni = vol->mft_ni;
 	if (va) {
-		err = vnode_get(mft_ni->vn);
-		if (err) {
+		/*
+		 * FIXME: Next If statement always false because of replacing
+		 * vnode_get() with vhold()
+		 */
+		vhold(mft_ni->vn);
+		if (0) {
 			ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 			sx_xunlock(&vol->mftbmp_lock);
 			return err;
 		}
 	}
 	mftbmp_ni = vol->mftbmp_ni;
-	err = vnode_get(mftbmp_ni->vn);
-	if (err) {
+	/*
+	 * FIXME: Next If statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */
+	vhold(mftbmp_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$Bitmap.");
 		if (va)
-			(void)vnode_put(mft_ni->vn);
+			vdrop(mft_ni->vn);
 		sx_xunlock(&vol->mftbmp_lock);
 		return err;
 	}
@@ -2880,7 +2904,7 @@ retry:
 			sx_sunlock(&mft_ni->lock);
 			ntfs_inode_unlock_alloc(ni);
 			(void)vnode_recycle(ni->vn);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			goto free_undo_mftbmp_alloc;
 		}
 		err = ntfs_mft_record_map_ext(ni, &m, TRUE);
@@ -2888,7 +2912,7 @@ retry:
 		if (err) {
 			ntfs_inode_unlock_alloc(ni);
 			(void)vnode_recycle(ni->vn);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			goto free_undo_mftbmp_alloc;
 		}
 		a = (ATTR_RECORD*)((u8*)m + le16_to_cpu(m->attrs_offset));
@@ -2909,9 +2933,9 @@ retry:
 	 * Note we still retain an iocount reference on the mft vnode due to
 	 * the above call to ntfs_{,extent_}mft_record_map().
 	 */
-	(void)vnode_put(mftbmp_ni->vn);
+	vdrop(mftbmp_ni->vn);
 	if (va)
-		(void)vnode_put(mft_ni->vn);
+		vdrop(mft_ni->vn);
 	/*
 	 * Return the opened, allocated inode of the allocated mft record as
 	 * well as the mapped mft record.
@@ -3003,9 +3027,9 @@ undo_mftbmp_alloc_locked:
 	sx_sunlock(&mftbmp_ni->lock);
 err:
 	sx_xunlock(&vol->mftbmp_lock);
-	(void)vnode_put(mftbmp_ni->vn);
+	vdrop(mftbmp_ni->vn);
 	if (va)
-		(void)vnode_put(mft_ni->vn);
+		vdrop(mft_ni->vn);
 	return err;
 max_err:
 	ntfs_warning(vol->mp, "Cannot allocate mft record because the maximum "
@@ -3123,14 +3147,18 @@ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni, ntfs_inode *ni,
 	 * making it available for someone else to allocate it.
 	 */
 	sx_xlock(&vol->mftbmp_lock);
-	err = vnode_get(vol->mftbmp_ni->vn);
-	if (err)
+	/*
+	 * FIXME: Next If statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */ 
+	vhold(vol->mftbmp_ni->vn);
+	if (0)
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT/$BITMAP.");
 	else {
 		sx_slock(&vol->mftbmp_ni->lock);
 		err = ntfs_bitmap_clear_bit(vol->mftbmp_ni, mft_no);
 		sx_sunlock(&vol->mftbmp_ni->lock);
-		(void)vnode_put(vol->mftbmp_ni->vn);
+		vdrop(vol->mftbmp_ni->vn);
 		if (!err) {
 			/*
 			 * We cleared a bit in the mft bitmap thus we need to

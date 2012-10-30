@@ -530,8 +530,12 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 	/* An empty $LogFile must have been clean before it got emptied. */
 	if (NVolLogFileEmpty(vol))
 		goto is_empty;
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: Next IF statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */
+	vhold(ni->vn);
+	if (0) {
 		if (err == EINVAL)
 			err = EIO;
 		ntfs_error(vol->mp, "Failed to get vnode for $LogFile.");
@@ -566,7 +570,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 			log_page_bits < NtfsMinLogRecordPages) {
 		ntfs_error(vol->mp, "$LogFile is too small.");
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 		return EINVAL;
 	}
 	/*
@@ -670,7 +674,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 	if (upl)
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	if (logfile_is_empty) {
 		NVolSetLogFileEmpty(vol);
 is_empty:
@@ -712,7 +716,7 @@ is_empty:
 	return 0;
 err:
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	if (rstr1_ph)
 		free(rstr1_ph, M_NTFS);
 	return err;
@@ -795,9 +799,12 @@ errno_t ntfs_logfile_empty(ntfs_inode *ni)
 	if (!NVolLogFileEmpty(vol)) {
 		s64 data_size;
 		errno_t err;
-
-		err = vnode_get(ni->vn);
-		if (err) {
+		/*
+		 * FIXME: Next IF statement always false because of replacing
+		 * vnode_get() with vhold()
+		 */
+		vhold(ni->vn);
+		if (0) {
 			ntfs_error(vol->mp, "Failed to get vnode for "
 					"$LogFile.");
 			return err;
@@ -808,7 +815,7 @@ errno_t ntfs_logfile_empty(ntfs_inode *ni)
 		mtx_unlock_spin(&ni->size_lock);
 		err = ntfs_attr_set(ni, 0, data_size, 0xff);
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to fill $LogFile with "
 					"0xff bytes (error code %d).", err);

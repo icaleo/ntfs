@@ -70,8 +70,12 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 		j_size = vol->usnjrnl_j_ni->data_size;
 		mtx_unlock_spin(&vol->usnjrnl_j_ni->size_lock);
 		max_ni = vol->usnjrnl_max_ni;
-		err = vnode_get(max_ni->vn);
-		if (err) {
+		/*
+		 * FIXME: Next If statement always false because of
+		 * replacing vnode_get() with vhold()
+		 */
+		vhold(max_ni->vn);
+		if (0) {
 			ntfs_error(vol->mp, "Failed to get vnode for "
 					"$UsnJrnl/$DATA/$Max.");
 			return err;
@@ -81,7 +85,7 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 		if (err) {
 			ntfs_error(vol->mp, "Failed to read from "
 					"$UsnJrnl/$DATA/$Max attribute.");
-			(void)vnode_put(max_ni->vn);
+			vdrop(max_ni->vn);
 			return err;
 		}
 		stamp = ntfs_current_time();
@@ -99,7 +103,7 @@ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol)
 		uh->journal_id = stamp;
 		ntfs_page_unmap(max_ni, upl, pl, TRUE);
 		sx_sunlock(&max_ni->lock);
-		(void)vnode_put(max_ni->vn);
+		vdrop(max_ni->vn);
 		/* Set the flag so we do not have to do it again on remount. */
 		NVolSetUsnJrnlStamped(vol);
 		// TODO: Should we mark any times on the base inode $UsnJrnl

@@ -2191,7 +2191,7 @@ allocated_bit:
 		ictx->bmp_is_locked = 0;
 		sx_xunlock(&bmp_ni->lock);
 	}
-	(void)vnode_put(bmp_ni->vn);
+	vdrop(bmp_ni->vn);
 	/* Lay out an empty index block into the allocated space. */
 	ia = (INDEX_ALLOCATION*)(bmp + (((unsigned)bmp_pos <<
 			idx_ni->block_size_shift) & PAGE_MASK));
@@ -2230,7 +2230,7 @@ put_err:
 		ictx->bmp_is_locked = 0;
 		sx_xunlock(&bmp_ni->lock);
 	}
-	(void)vnode_put(bmp_ni->vn);
+	vdrop(bmp_ni->vn);
 err:
 	ntfs_error(idx_ni->vol->mp, "Failed (error %d).", err);
 	return err;
@@ -4503,7 +4503,7 @@ err:
 		cur_ictx = cur_ictx->down;
 	} while (1);
 	sx_sunlock(&bmp_ni->lock);
-	(void)vnode_put(bmp_ni->vn);
+	vdrop(bmp_ni->vn);
 err_out:
 	ntfs_error(idx_ni->vol->mp, "Failed (error %d).", err);
 	return err;
@@ -4856,7 +4856,7 @@ static errno_t ntfs_index_block_free(ntfs_index_context *ictx)
 		ntfs_error(vol->mp, "Failed to deallocate index block in "
 				"index bitmap (error %d).", err);
 		sx_xunlock(&bmp_ni->lock);
-		(void)vnode_put(bmp_ni->vn);
+		vdrop(bmp_ni->vn);
 		return err;
 	}
 	/* If this is not the last set bit, we are done. */
@@ -4866,7 +4866,7 @@ done:
 				"deallocated one).");
 out:
 		sx_xunlock(&bmp_ni->lock);
-		(void)vnode_put(bmp_ni->vn);
+		vdrop(bmp_ni->vn);
 		return 0;
 	}
 	/*
@@ -5169,7 +5169,7 @@ static errno_t ntfs_index_make_empty(ntfs_index_context *ictx)
 					"entries.");
 	}
 	sx_xunlock(&bmp_ni->lock);
-	(void)vnode_put(bmp_ni->vn);
+	vdrop(bmp_ni->vn);
 	/*
 	 * We no longer have any index blocks allocated so invalidate our cache
 	 * of the last set bit.
@@ -5210,7 +5210,7 @@ err:
 		}
 	} while ((ictx = ictx->up) != start_ictx);
 	sx_xunlock(&bmp_ni->lock);
-	(void)vnode_put(bmp_ni->vn);
+	vdrop(bmp_ni->vn);
 	ntfs_error(idx_ni->vol->mp, "Failed (error %d).", err);
 	return err;
 }

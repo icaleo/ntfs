@@ -357,8 +357,7 @@ retry_map:
 					 */
 					if (err2) {
 						if (err2 == ENOMEM) {
-							(void)thread_block(
-							THREAD_CONTINUE_NULL);
+							sched_relinquish(curthread);
 							goto retry_map;
 						}
 						ctx->is_error = 1;
@@ -3373,8 +3372,7 @@ retry_map:
 				 * write out.
 				 */
 				if (err == ENOMEM) {
-					(void)thread_block(
-							THREAD_CONTINUE_NULL);
+					sched_relinquish(curthread);
 					goto retry_map;
 				}
 				ctx.ni = base_ni;

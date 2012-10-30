@@ -1045,7 +1045,7 @@ info_err:
 			 * be taken as and when required in the low level code.
 			 * We can ignore the return value as it always is zero.
 			 */
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			/* If $MFT/$DATA has only one extent, we are done. */
 			if (highest_vcn == last_vcn - 1)
 				break;
@@ -1147,7 +1147,7 @@ static errno_t ntfs_inode_attach(ntfs_volume *vol, const ino64_t mft_no,
 		ntfs_error(vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&(*ni)->nr_refs, 1);
 	sx_sunlock(&(*ni)->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	ntfs_debug("Done.");
 	return 0;
 }
@@ -1203,7 +1203,7 @@ static errno_t ntfs_attr_inode_attach(ntfs_inode *base_ni,
 		ntfs_error(base_ni->vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&(*ni)->nr_refs, 1);
 	sx_sunlock(&(*ni)->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	ntfs_debug("Done.");
 	return 0;
 }
@@ -1254,7 +1254,7 @@ static errno_t ntfs_index_inode_attach(ntfs_inode *base_ni, ntfschar *name,
 	if (err)
 		ntfs_error(base_ni->vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&(*ni)->nr_refs, 1);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	ntfs_debug("Done.");
 	return 0;
 }
@@ -1312,7 +1312,7 @@ static errno_t ntfs_mft_mirror_load(ntfs_volume *vol)
 		ntfs_error(vol->mp, "$DATA attribute contains invalid size.  "
 				"$MFTMirr is corrupt.  Run chkdsk.");
 		(void)vnode_recycle(vn);
-		(void)vnode_put(vn);
+		vdrop(vn);
 		return EIO;
 	}
 	atomic_add_32(&vol->root_ni->nr_refs, 1);
@@ -1321,7 +1321,7 @@ static errno_t ntfs_mft_mirror_load(ntfs_volume *vol)
 		ntfs_error(vol->mp, "vnode_ref() failed!");
 	atomic_add_32(&ni->nr_refs, 1);
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	vol->mftmirr_ni = ni;
 	ntfs_debug("Done.");
 	return 0;
@@ -1363,8 +1363,12 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 	}
 	mirr = (MFT_RECORD*)mirr_start;
 	ni = vol->mftmirr_ni;
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: The next IF statement is always false because of
+	 * replacing vnode_get() with vhold()
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFTMirr.");
 		goto err;
 	}
@@ -1431,14 +1435,17 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 		ntfs_debug("Done.");
 	sx_sunlock(&ni->rl.lock);
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	/*
 	 * Now read the $MFT records one at a time and compare each against the
 	 * already read $MFTMirr records.
 	 */
 	ni = vol->mft_ni;
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: 
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $MFT.");
 		goto err;
 	}
@@ -1499,7 +1506,7 @@ static errno_t ntfs_mft_mirror_check(ntfs_volume *vol)
 	}
 unlock:
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 err:
 	free(mirr_start, M_NTFS);
 	return err;
@@ -1572,7 +1579,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 	}
 	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	vol->upcase_len = data_size >> NTFSCHAR_SIZE_SHIFT;
 	ntfs_debug("Read %lld bytes from $UpCase (expected %lu bytes).",
 			(long long)data_size, 64LU * 1024 * sizeof(ntfschar));
@@ -1613,7 +1620,7 @@ err:
 	if (ni) {
 		sx_sunlock(&ni->lock);
 		(void)vnode_recycle(ni->vn);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 	}
 	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
 	if (ntfs_default_upcase) {
@@ -1689,7 +1696,7 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 	}
 	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	vol->attrdef_size = data_size;
 	ntfs_debug("Done.  Read %lld bytes from $AttrDef.",
 			(long long)data_size);
@@ -1702,7 +1709,7 @@ err:
 	if (ni) {
 		sx_sunlock(&ni->lock);
 		(void)vnode_recycle(ni->vn);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 	}
 	ntfs_error(vol->mp, "Failed to initialize attribute definitions "
 			"table.");
@@ -1736,8 +1743,12 @@ static errno_t ntfs_volume_load(ntfs_volume *vol)
 		return err;
 	}
 	vol->vol_ni = ni;
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: The next IF statement is always false because of
+	 * replacing vnode_get() with vhold() 
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Volume.");
 		return err;
 	}
@@ -1844,13 +1855,13 @@ put_err:
 	}
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(ni);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	ntfs_debug("Done.");
 	return 0;
 unm_err:
 	ntfs_mft_record_unmap(ni);
 err:
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	/* Obtained inode will be released by the call to ntfs_unmount(). */
 	return err;
 }
@@ -1983,7 +1994,7 @@ unm:
 put:
 	sx_sunlock(&ni->lock);
 	(void)vnode_recycle(ni->vn);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	return err;
 }
 
@@ -2447,8 +2458,12 @@ not_enabled:
 				(unsigned)sizeof(USN_HEADER));
 		return EIO;
 	}
-	err = vnode_get(max_ni->vn);
-	if (err) {
+	/*
+	 * FIXME: The next IF statement is always false because of
+	 * replacement vnode_get() with vhold()
+	 */
+	vhold(max_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for "
 				"$UsnJrnl/$DATA/$Max.");
 		return err;
@@ -2499,7 +2514,7 @@ not_enabled:
 		if (sle64_to_cpu(uh->lowest_valid_usn) == data_size) {
 			ntfs_page_unmap(max_ni, upl, pl, FALSE);
 			sx_sunlock(&max_ni->lock);
-			(void)vnode_put(max_ni->vn);
+			vdrop(max_ni->vn);
 			ntfs_debug("$UsnJrnl is enabled but nothing has been "
 					"logged since it was last stamped.  "
 					"Treating this as if the volume does "
@@ -2520,7 +2535,7 @@ unm_err:
 	ntfs_page_unmap(max_ni, upl, pl, FALSE);
 put_err:
 	sx_sunlock(&max_ni->lock);
-	(void)vnode_put(max_ni->vn);
+	vdrop(max_ni->vn);
 	return err;
 }
 
@@ -3049,9 +3064,13 @@ static errno_t ntfs_get_nr_set_bits(vnode_t vn, const s64 nr_bits, s64 *res)
 	errno_t err;
 
 	ntfs_debug("Entering.");
-	/* Get an iocount reference on the bitmap vnode. */
-	err = vnode_get(vn);
-	if (err)
+	/* 
+	 * Hold the bitmap vnode.
+	 * FIXME: The next IF statement is always false because of 
+	 * replacing vnode_get() with vhold()
+	 */
+	vhold(vn);
+	if (0)
 		return err;
 	sx_slock(&ni->lock);
 	/* Convert the number of bits into bytes rounded up. */
@@ -3092,7 +3111,7 @@ static errno_t ntfs_get_nr_set_bits(vnode_t vn, const s64 nr_bits, s64 *res)
 	 * the return value as it always is zero.
 	 */
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	ntfs_debug("Done (nr_bits %lld, nr_set %lld).", (long long)nr_bits,
 			(long long)nr_set);
 	*res = nr_set;
@@ -3466,7 +3485,7 @@ static int ntfs_unmount(mount_t mp, int mnt_flags)
 	}
 	/*
 	 * Once we get here, the only vnodes left are our system vnodes, which
-	 * we will detach and vnode_put below.  At this point, the system
+	 * we will detach and vdrop() below.  At this point, the system
 	 * directories may still have index attributes with references on the
 	 * directory vnodes.  And we might have other system vnodes still
 	 * hanging around, with no references.  So we will explicitly try to
@@ -3688,9 +3707,12 @@ static void ntfs_sync_helper(ntfs_inode *ni, struct ntfs_sync_args *args,
 		const BOOL skip_mft_record_sync)
 {
 	errno_t err;
-
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: The next IF statement is always false because of 
+	 * replacement vnode_get() with vhold()
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(ni->vol->mp, "Failed to get vnode for $MFT%s "
 				"(error %d).",
 				(ni == ni->vol->mft_ni) ? "" : "Mirr",
@@ -3698,7 +3720,7 @@ static void ntfs_sync_helper(ntfs_inode *ni, struct ntfs_sync_args *args,
 		goto err;
 	}
 	err = ntfs_inode_sync(ni, args->sync, skip_mft_record_sync);
-	vnode_put(ni->vn);
+	vdrop(ni->vn);
 	/* Skip deleted inodes. */
 	if (err && err != ENOENT) {
 		ntfs_error(ni->vol->mp, "Failed to sync $MFT%s (error %d).",
@@ -4350,11 +4372,15 @@ static int ntfs_root(mount_t mp, int flags, struct vnode **vpp)
 	 * vnode of the ntfs inode.  It is ok to do this here because we know
 	 * the root directory is loaded and attached to the ntfs volume (thus
 	 * we already hold a use count reference on the vnode).
+	 *
+	 * FIXME: The next IF statement if always true because of replacement
+	 * vnode_get() with vhold()
 	 */
-	err = vnode_get(vn);
-	if (!err) {
+	vhold(vn);
+	if (1) {
 		*vpp = vn;
 		ntfs_debug("Done.");
+		err = 0;
 	} else {
 		*vpp = NULL;
 		ntfs_error(mp, "Cannot return root vnode because vnode_get() "
@@ -4416,8 +4442,12 @@ static int ntfs_vget(mount_t mp, ino64_t ino, int flags, struct vnode **vpp)
 		 */
 		ni = NTFS_MP(mp)->root_ni;
 		if (ni) {
-			err = vnode_get(ni->vn);
-			if (!err)
+			/*
+			 * FIXME: The next IF statement is always true because
+			 * of replacing vnode_get() with vhold()
+			 */
+			vhold(ni->vn);
+			if (1)
 				goto done;
 		}
 		ino = FILE_root;
@@ -5075,8 +5105,12 @@ static errno_t ntfs_volume_rename(ntfs_volume *vol, char *name)
 	}
 	if (strlcpy((char*)utf8_name, name, utf8_name_size) >= utf8_name_size)
 		panic("%s(): strlcpy() failed\n", __FUNCTION__);
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: The next IF statement is always false because of
+	 * replacing vnode_get() with vhold()
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Volume.");
 		goto err;
 	}
@@ -5257,7 +5291,7 @@ done:
 	vol->name_size = utf8_name_size;
 	ntfs_attr_search_ctx_put(ctx);
 	ntfs_mft_record_unmap(ni);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	free(name, M_NTFS);
 	ntfs_debug("Done.");
 	return 0;
@@ -5270,7 +5304,7 @@ put_err:
 		ntfs_attr_search_ctx_put(ctx);
 	if (m)
 		ntfs_mft_record_unmap(ni);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 err:
 	if (utf8_name)
 		free(utf8_name, M_NTFS);

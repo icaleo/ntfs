@@ -179,12 +179,18 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 	}
 	/* Take the lcnbmp lock for writing. */
 	sx_xlock(&vol->lcnbmp_lock);
-	err = vnode_get(lcnbmp_ni->vn);
-	if (err) {
+	/* 
+	 * FIXME: Next IF statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */ 
+	vhold(lcnbmp_ni->vn);
+	/*
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
 		sx_xunlock(&vol->lcnbmp_lock);
 		return err;
 	}
+	*/
 	sx_slock(&lcnbmp_ni->lock);
 	/*
 	 * If no specific @start_lcn was requested, use the current data zone
@@ -812,7 +818,7 @@ out:
 			}
 		}
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_ni->vn);
+		vdrop(lcnbmp_ni->vn);
 		sx_xunlock(&vol->lcnbmp_lock);
 		if (runlist->alloc)
 			free(runlist->rl, M_NTFS);
@@ -849,7 +855,7 @@ out:
 		ntfs_debug("No space left at all, err ENOSPC, first free lcn "
 				"0x%llx.", (long long)vol->data1_zone_pos);
 	sx_sunlock(&lcnbmp_ni->lock);
-	(void)vnode_put(lcnbmp_ni->vn);
+	vdrop(lcnbmp_ni->vn);
 	sx_xunlock(&vol->lcnbmp_lock);
 	return err;
 }
@@ -1032,15 +1038,19 @@ errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol, ntfs_rl_element *rl,
 	lcnbmp_ni = vol->lcnbmp_ni;
 	lcnbmp_vn = lcnbmp_ni->vn;
 	sx_xlock(&vol->lcnbmp_lock);
-	err = vnode_get(lcnbmp_vn);
-	if (!err) {
+	/*
+	 * FIXME: Next IF  statement always true because of replacing
+	 * vnode_get() with vhold()
+ 	 */
+	vhold(lcnbmp_vn);
+	if (1) {
 		sx_slock(&lcnbmp_ni->lock);
 		err = ntfs_cluster_free_from_rl_nolock(vol, rl, start_vcn,
 				count, nr_freed);
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_vn);
+		vdrop(lcnbmp_vn);
 		sx_xunlock(&vol->lcnbmp_lock);
-		return err;
+		return (0);
 	}
 	sx_xunlock(&vol->lcnbmp_lock);
 	ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");
@@ -1370,15 +1380,19 @@ errno_t ntfs_cluster_free(ntfs_inode *ni, const VCN start_vcn, s64 count,
 	lcnbmp_ni = vol->lcnbmp_ni;
 	lcnbmp_vn = lcnbmp_ni->vn;
 	sx_xlock(&vol->lcnbmp_lock);
-	err = vnode_get(lcnbmp_vn);
-	if (!err) {
+	/*
+	 * FIXME: Next IF  statement always true because of replacing
+	 * vnode_get() with vhold()
+	 */
+	vhold(lcnbmp_vn);
+	if (1) {
 		sx_slock(&lcnbmp_ni->lock);
 		err = ntfs_cluster_free_nolock(ni, start_vcn, count, ctx,
 				nr_freed, FALSE);
 		sx_sunlock(&lcnbmp_ni->lock);
-		(void)vnode_put(lcnbmp_vn);
+		vdrop(lcnbmp_vn);
 		sx_xunlock(&vol->lcnbmp_lock);
-		return err;
+		return (0);
 	}
 	sx_xunlock(&vol->lcnbmp_lock);
 	ntfs_error(vol->mp, "Failed to get vnode for $Bitmap.");

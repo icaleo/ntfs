@@ -70,8 +70,12 @@ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol)
 		ntfs_error(vol->mp, "Quota inodes are not open.");
 		return EINVAL;
 	}
-	err = vnode_get(vol->quota_q_ni->vn);
-	if (err) {
+	/*
+	 * FIXME: Next IF statement always false because of replacing
+	 * vnode_get() with vhold()
+	 */
+	vhold(vol->quota_q_ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get index vnode for "
 				"$Quota/$Q.");
 		return err;
@@ -136,7 +140,7 @@ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol)
 set_done:
 	ntfs_index_ctx_put(ictx);
 	sx_xunlock(&vol->quota_q_ni->lock);
-	(void)vnode_put(vol->quota_q_ni->vn);
+	vdrop(vol->quota_q_ni->vn);
 	/*
 	 * We set the flag so we do not try to mark the quotas out of date
 	 * again on remount.
@@ -149,6 +153,6 @@ err:
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
 	sx_xunlock(&vol->quota_q_ni->lock);
-	(void)vnode_put(vol->quota_q_ni->vn);
+	vdrop(vol->quota_q_ni->vn);
 	return err;
 }

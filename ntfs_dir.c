@@ -235,7 +235,7 @@ found_it:
 			ntfs_attr_search_ctx_put(ctx);
 			ntfs_mft_record_unmap(dir_ni);
 			sx_sunlock(&ia_ni->lock);
-			(void)vnode_put(ia_vn);
+			vdrop(ia_vn);
 			return 0;
 		}
 		/*
@@ -495,7 +495,7 @@ found_it2:
 			*res_mref = le64_to_cpu(ie->indexed_file);
 			ntfs_page_unmap(ia_ni, upl, pl, FALSE);
 			sx_sunlock(&ia_ni->lock);
-			(void)vnode_put(ia_vn);
+			vdrop(ia_vn);
 			return 0;
 		}
 		/*
@@ -620,7 +620,7 @@ found_it2:
 	ntfs_page_unmap(ia_ni, upl, pl, FALSE);
 not_found:
 	sx_sunlock(&ia_ni->lock);
-	(void)vnode_put(ia_vn);
+	vdrop(ia_vn);
 	if (name) {
 		*res_mref = name->mref;
 		return 0;
@@ -641,7 +641,7 @@ err:
 	if (name)
 		free(name, M_NTFS);
 	sx_sunlock(&ia_ni->lock);
-	(void)vnode_put(ia_vn);
+	vdrop(ia_vn);
 	if (!err)
 		err = EIO;
 	ntfs_debug("Failed (error %d).", err);
@@ -1150,7 +1150,7 @@ errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio, int *eofflag,
 				 */
 				if (de->d_ino == FILE_root)
 					de->d_ino = 2;
-				(void)vnode_put(parent_vn);
+				vdrop(parent_vn);
 			} else {
 				MFT_REF mref;
 
@@ -1469,7 +1469,7 @@ dh_done:
 		ntfs_index_ctx_put(ictx);
 	if (ia_ni) {
 		sx_xunlock(&ia_ni->lock);
-		(void)vnode_put(ia_ni->vn);
+		vdrop(ia_ni->vn);
 	}
 	ntfs_debug("%s (returned 0x%x entries, %s, now at offset 0x%llx).",
 			err ? "Failed" : "Done", entries, eof ?
@@ -1762,10 +1762,10 @@ unm_done:
 done:
 	if (bmp_ni) {
 		sx_sunlock(&bmp_ni->lock);
-		(void)vnode_put(bmp_ni->vn);
+		vdrop(bmp_ni->vn);
 	}
 	sx_sunlock(&ia_ni->lock);
-	(void)vnode_put(ia_ni->vn);
+	vdrop(ia_ni->vn);
 	ntfs_debug("Done (directory is%s empty).", !err ? "" : " not");
 	return err;
 dir_err:
@@ -1787,10 +1787,10 @@ unm_err:
 err:
 	if (bmp_ni) {
 		sx_sunlock(&bmp_ni->lock);
-		(void)vnode_put(bmp_ni->vn);
+		vdrop(bmp_ni->vn);
 	}
 	sx_sunlock(&ia_ni->lock);
-	(void)vnode_put(ia_ni->vn);
+	vdrop(ia_ni->vn);
 	return err;
 vol_err:
 	NVolSetErrors(vol);
@@ -1945,7 +1945,7 @@ restart:
 				ntfs_utc_current_time();
 		NInoSetDirtyTimes(dir_ni);
 		sx_xunlock(&ia_ni->lock);
-		(void)vnode_put(ia_ni->vn);
+		vdrop(ia_ni->vn);
 		ntfs_debug("Done.");
 		return 0;
 	}
@@ -2007,7 +2007,7 @@ put_err:
 	ntfs_index_ctx_put(ictx);
 err:
 	sx_xunlock(&ia_ni->lock);
-	(void)vnode_put(ia_ni->vn);
+	vdrop(ia_ni->vn);
 	ntfs_debug("Failed (error %d).", err);
 	return err;
 }
@@ -2094,7 +2094,7 @@ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni, const FILENAME_ATTR *fn,
 	ntfs_index_ctx_put(ictx);
 	if (!err) {
 		sx_xunlock(&ia_ni->lock);
-		(void)vnode_put(ia_ni->vn);
+		vdrop(ia_ni->vn);
 		/* Update the mtime and ctime of the parent directory inode. */
 		dir_ni->last_mft_change_time = dir_ni->last_data_change_time =
 				ntfs_utc_current_time();
@@ -2104,6 +2104,6 @@ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni, const FILENAME_ATTR *fn,
 	}
 err:
 	sx_xunlock(&ia_ni->lock);
-	(void)vnode_put(ia_ni->vn);
+	vdrop(ia_ni->vn);
 	return err;
 }

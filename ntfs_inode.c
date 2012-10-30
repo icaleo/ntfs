@@ -508,7 +508,7 @@ retry:
 			if (vn) {
 				/* Remove the inode from the name cache. */
 				cache_purge(vn);
-				(void)vnode_put(vn);
+				vdrop(vn);
 			} else
 				ntfs_inode_reclaim(ni);
 			goto retry;
@@ -581,7 +581,7 @@ retry:
 				cn->cn_flags &= ~MAKEENTRY;
 			}
 			if (old_parent_vn)
-				(void)vnode_put(old_parent_vn);
+				vdrop(old_parent_vn);
 		}
 		*nni = ni;
 		ntfs_debug("Done (found in cache).");
@@ -627,7 +627,7 @@ retry:
 			ni->initialized_size = ini->initialized_size;
 			mtx_unlock_spin(&ini->size_lock);
 			/* We are done with the index vnode. */
-			(void)vnode_put(ini->vn);
+			vdrop(ini->vn);
 		}
 		ntfs_inode_unlock_alloc(ni);
 		*nni = ni;
@@ -647,7 +647,7 @@ err:
 	else if (lock == LCK_RW_TYPE_SHARED)
 		sx_sunlock(&ni->lock);
 	if (vn)
-		(void)vnode_put(vn);
+		vdrop(vn);
 	else
 		ntfs_inode_reclaim(ni);
 	return err;
@@ -871,7 +871,7 @@ relocked:
 						sx_sunlock(&ni->lock);
 				}
 				if (vn)
-					(void)vnode_put(vn);
+					vdrop(vn);
 				else
 					ntfs_inode_reclaim(ni);
 				goto retry;
@@ -975,7 +975,7 @@ allow_rsrc_fork:
 						0, 0, VNODE_UPDATE_PARENT);
 			}
 			if (parent_vn)
-				(void)vnode_put(parent_vn);
+				vdrop(parent_vn);
 		}
 		if (promoted)
 			sx_downgrade(&ni->lock);
@@ -1024,7 +1024,7 @@ err:
 			sx_sunlock(&ni->lock);
 	}
 	if (vn)
-		(void)vnode_put(vn);
+		vdrop(vn);
 	else
 		ntfs_inode_reclaim(ni);
 	return err;
@@ -1097,7 +1097,7 @@ errno_t ntfs_index_inode_get(ntfs_inode *base_ni, ntfschar *name, u32 name_len,
 					"returning ENOENT.",
 					(unsigned long long)ni->mft_no);
 			if (vn)
-				(void)vnode_put(vn);
+				vdrop(vn);
 			else
 				ntfs_inode_reclaim(ni);
 			return ENOENT;
@@ -1113,7 +1113,7 @@ errno_t ntfs_index_inode_get(ntfs_inode *base_ni, ntfschar *name, u32 name_len,
 						0, 0, VNODE_UPDATE_PARENT);
 			}
 			if (parent_vn)
-				(void)vnode_put(parent_vn);
+				vdrop(parent_vn);
 		}
 		*nni = ni;
 		ntfs_debug("Done (found in cache).");
@@ -1414,7 +1414,7 @@ errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni)
 	ntfs_debug("Done.");
 err:
 	sx_sunlock(&afp_ni->lock);
-	(void)vnode_put(afp_ni->vn);
+	vdrop(afp_ni->vn);
 	return err;
 }
 
@@ -1662,12 +1662,12 @@ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni)
 	ntfs_page_unmap(afp_ni, upl, pl, TRUE);
 done:
 	sx_xunlock(&afp_ni->lock);
-	(void)vnode_put(afp_ni->vn);
+	vdrop(afp_ni->vn);
 	ntfs_debug("Done.");
 	return 0;
 unl_err:
 	sx_xunlock(&afp_ni->lock);
-	(void)vnode_put(afp_ni->vn);
+	vdrop(afp_ni->vn);
 err:
 	NInoClearDirtyBackupTime(ni);
 	NInoClearDirtyFinderInfo(ni);
@@ -3029,7 +3029,7 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 			ntfs_error(vol->mp, "Bitmap attribute is compressed "
 					"and/or encrypted and/or sparse.");
 			sx_sunlock(&bni->lock);
-			(void)vnode_put(bni->vn);
+			vdrop(bni->vn);
 			goto err;
 		}
 		/* Consistency check bitmap size vs. index allocation size. */
@@ -3040,11 +3040,11 @@ static errno_t ntfs_index_inode_read(ntfs_inode *base_ni, ntfs_inode *ni)
 					(unsigned long long)bni->data_size,
 					(unsigned long long)ni->data_size);
 			sx_sunlock(&bni->lock);
-			(void)vnode_put(bni->vn);
+			vdrop(bni->vn);
 			goto err;
 		}
 		sx_sunlock(&bni->lock);
-		(void)vnode_put(bni->vn);
+		vdrop(bni->vn);
 	}
 	/*
 	 * Attach the base inode to the attribute inode and vice versa.  Note
@@ -3199,8 +3199,7 @@ static inline void ntfs_inode_free(ntfs_inode *ni)
  * Destroy the ntfs inode @ni freeing all its resources in the process.  We are
  * assured that no-one can get the inode because to do that they would have to
  * take a reference on the corresponding vnode and that is not possible because
- * the vnode is flagged for termination thus the vnode_get() will return an
- * error.
+ * the vnode is flagged for termination thus the vhold() will panic().
  *
  * Note: When called from reclaim, the vnode of the ntfs inode has a zero
  *	 v_iocount and v_usecount and vnode_isrecycled() is true.
@@ -3234,15 +3233,17 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 
 			attr_ni = ni->attr_nis[ni->nr_attr_nis - 1];
 			err = 1;
-			if (!NInoDeleted(attr_ni))
-				err = vnode_get(attr_ni->vn);
+			if (!NInoDeleted(attr_ni)) {
+				vhold(attr_ni->vn);
+				err = 0;
+			}
 			mtx_unlock(&ni->attr_nis_lock);
 			if (!err) {
 				vnode_recycle(attr_ni->vn);
-				vnode_put(attr_ni->vn);
+				vdrop(attr_ni->vn);
 			}
 			/* Give it a chance to go away... */
-			(void)thread_block(THREAD_CONTINUE_NULL);
+			sched_relinquish(curthread);
 			if (count < 1000)
 				count++;
 			else if (count == 1000) {
@@ -3777,8 +3778,8 @@ static errno_t ntfs_inode_sync_to_mft_record(ntfs_inode *ni)
 			if (dir_ni) {
 				sx_xunlock(&dir_ia_ni->lock);
 				sx_xunlock(&dir_ni->lock);
-				(void)vnode_put(dir_ia_ni->vn);
-				(void)vnode_put(dir_ni->vn);
+				vdrop(dir_ia_ni->vn);
+				vdrop(dir_ni->vn);
 			}
 			err = ntfs_inode_get(vol, dir_mft_no, FALSE,
 					LCK_RW_TYPE_EXCLUSIVE, &dir_ni, NULL,
@@ -3813,7 +3814,7 @@ do_skip_name:
 			 */
 			if (dir_ni->seq_no != MSEQNO_LE(fn->parent_directory)) {
 				sx_xunlock(&dir_ni->lock);
-				vnode_put(dir_ni->vn);
+				vdrop(dir_ni->vn);
 				goto do_skip_name;
 			}
 			err = ntfs_index_inode_get(dir_ni, I30, 4, FALSE,
@@ -3823,7 +3824,7 @@ do_skip_name:
 						"opening the parent directory "
 						"index inode failed", err);
 				sx_xunlock(&dir_ni->lock);
-				(void)vnode_put(dir_ni->vn);
+				vdrop(dir_ni->vn);
 				goto list_err;
 			}
 			sx_xlock(&dir_ia_ni->lock);
@@ -3844,8 +3845,8 @@ do_skip_name:
 				ntfs_index_ctx_put_reuse(ictx);
 				sx_xunlock(&dir_ia_ni->lock);
 				sx_xunlock(&dir_ni->lock);
-				(void)vnode_put(dir_ia_ni->vn);
-				(void)vnode_put(dir_ni->vn);
+				vdrop(dir_ia_ni->vn);
+				vdrop(dir_ni->vn);
 				goto list_err;
 			}
 			/*
@@ -3899,8 +3900,8 @@ skip_name:
 	if (dir_ni) {
 		sx_xunlock(&dir_ia_ni->lock);
 		sx_xunlock(&dir_ni->lock);
-		(void)vnode_put(dir_ia_ni->vn);
-		(void)vnode_put(dir_ni->vn);
+		vdrop(dir_ia_ni->vn);
+		vdrop(dir_ni->vn);
 	}
 	ntfs_index_ctx_free(ictx);
 done:
@@ -4457,7 +4458,7 @@ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni, ntfs_inode *child_ni,
 					(unsigned long long)child_ni->mft_no);
 			if (prev_vn) {
 				sx_sunlock(&ni->lock);
-				(void)vnode_put(prev_vn);
+				vdrop(prev_vn);
 			}
 			return EINVAL;
 		}
@@ -4471,7 +4472,7 @@ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni, ntfs_inode *child_ni,
 		if (vn) {
 			if (prev_vn) {
 				sx_sunlock(&ni->lock);
-				(void)vnode_put(prev_vn);
+				vdrop(prev_vn);
 			}
 			ni = NTFS_I(vn);
 			sx_slock(&ni->lock);
@@ -4498,7 +4499,7 @@ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni, ntfs_inode *child_ni,
 			mft_no = ni->mft_no;
 			if (prev_vn) {
 				sx_sunlock(&ni->lock);
-				(void)vnode_put(prev_vn);
+				vdrop(prev_vn);
 			}
 			if (err) {
 				ntfs_error(vol->mp, "Failed to determine "
@@ -4534,7 +4535,7 @@ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni, ntfs_inode *child_ni,
 		 */
 		if (ni == parent_ni) {
 			sx_sunlock(&ni->lock);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			*is_parent = TRUE;
 			ntfs_debug("Parent mft_no 0x%llx is a parent of "
 					"child mft_no 0x%llx.",
@@ -4546,7 +4547,7 @@ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni, ntfs_inode *child_ni,
 	}
 	if (prev_vn) {
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(prev_vn);
+		vdrop(prev_vn);
 	}
 	/*
 	 * We reached the root directory of the volume without encountering
@@ -4562,6 +4563,6 @@ deleted:
 	ntfs_error(ni->vol->mp, "Parent mft_no 0x%llx has been deleted.  "
 			"Returning ENOENT.", (unsigned long long)ni->mft_no);
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	return ENOENT;
 }

@@ -284,7 +284,7 @@ compressed:
 						"ntfs_read_compressed() "
 						"failed (error %d).", err);
 			sx_sunlock(&raw_ni->lock);
-			(void)vnode_put(raw_ni->vn);
+			vdrop(raw_ni->vn);
 		}
 	}
 	kerr = ubc_upl_unmap(upl);

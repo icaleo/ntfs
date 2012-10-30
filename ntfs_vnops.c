@@ -660,7 +660,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 			sx_sunlock(&ni->lock);
 			/* Remove the inode from the name cache. */
 			cache_purge(vn);
-			vnode_put(vn);
+			vdrop(vn);
 			ntfs_warning(vol->mp, "Cached but deleted vnode "
 					"found, purged from cache and doing "
 					"real lookup.");
@@ -685,14 +685,20 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 					"EISDIR.");
 			return EISDIR;
 		}
-		err = vnode_get(dir_ni->vn);
+		vhold(dir_ni->vn);
+		/*
+		 * FIXME: Error handling should be here for OS X's vnode_get()
+		 * 	  but FreeBSD's vhold() returns void so we just omit it.
+		 * 	  Will have panic() if vhold() fails.
+		 *
+ 		 * if (err) {
+ 		 * 	ntfs_error(vol->mp, "Failed to get iocount reference "
+ 		 * 		"on current directory (error %d).",
+ 		 * 		err);
+ 		 * 	return err;
+		 * } 
+ 		 */
 		sx_sunlock(&dir_ni->lock);
-		if (err) {
-			ntfs_error(vol->mp, "Failed to get iocount reference "
-					"on current directory (error %d).",
-					err);
-			return err;
-		}
 		ntfs_debug("Got \".\" directory 0x%llx.",
 				(unsigned long long)dir_ni->mft_no);
 		*a->a_vpp = dir_ni->vn;
@@ -740,7 +746,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		/* Consistency check. */
 		if (MSEQNO(mref) != ni->seq_no) {
 			sx_sunlock(&ni->lock);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			ntfs_error(vol->mp, "Found stale parent mft reference "
 					"in filename of directory 0x%llx.  "
 					"Volume is corrupt.  Run chkdsk.",
@@ -749,7 +755,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		}
 		if (!S_ISDIR(ni->mode)) {
 			sx_sunlock(&ni->lock);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			ntfs_error(vol->mp, "Found non-directory parent for "
 					"filename of directory 0x%llx.  "
 					"Volume is corrupt.  Run chkdsk.",
@@ -918,7 +924,7 @@ not_found:
 		// FILE_MFT" test...
 		if (MSEQNO(mref) != ni->seq_no && mft_no != FILE_MFT) {
 			sx_sunlock(&ni->lock);
-			(void)vnode_put(ni->vn);
+			vdrop(ni->vn);
 			ntfs_debug("Inode was deleted and reused under our "
 					"feet.");
 			err = ENOENT;
@@ -953,7 +959,7 @@ not_found:
 			goto handle_dos_name;
 		}
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 		ntfs_debug("Done (intermediate path component requested but "
 				"found inode is not a directory or symbolic "
 				"link, returning ENOTDIR).");
@@ -1075,7 +1081,7 @@ unm_err:
 	ntfs_mft_record_unmap(ni);
 err:
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(vn);
+	vdrop(vn);
 	return err;
    }
 }
@@ -1369,7 +1375,7 @@ again:
 	 *
 	 * We then also need to set the link count in the ntfs inode to zero to
 	 * reflect that it is deleted and to ensure that the subsequent
-	 * vnode_put() results in ntfs_delete_inode() being called (via
+	 * vdrop() results in ntfs_delete_inode() being called (via
 	 * VNOP_INACTIVE() and ntfs_vnop_inactive() respectively).
 	 *
 	 * But first, unlock the allocated ntfs inode if we locked it above.
@@ -1394,7 +1400,7 @@ rm_err:
 	sx_xunlock(&dir_ni->lock);
 	ntfs_inode_unlock_alloc(ni);
 	cache_purge(ni->vn);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	if (err == EEXIST) {
 		/*
 		 * There are two possible reasons why the directory entry
@@ -1472,7 +1478,7 @@ rm_err:
 			 * of a file for example.
 			 */
 			if (!err && vnode_vtype(*vn) != VREG) {
-				(void)vnode_put(*vn);
+				vdrop(*vn);
 				*vn = NULL;
 				err = EEXIST;
 			}
@@ -1953,7 +1959,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 			VATTR_RETURN(va, va_parentid, 1);
 		else if ((parent_vn = vnode_getparent(ni->vn))) {
 			parent_mft_no = NTFS_I(parent_vn)->mft_no;
-			(void)vnode_put(parent_vn);
+			vdrop(parent_vn);
 			have_parent = TRUE;
 			if (parent_mft_no == FILE_root)
 				parent_mft_no = 2;
@@ -2661,7 +2667,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 	ntfs_debug("Done.");
 err:
 	sx_sunlock(&raw_ni->lock);
-	(void)vnode_put(raw_ni->vn);
+	vdrop(raw_ni->vn);
 	return err;
 unm_err:
 	kerr = ubc_upl_unmap(upl);
@@ -4190,12 +4196,18 @@ restart_name:
 					object_id, sizeof(object_id));
 			ntfs_attr_search_ctx_put(actx);
 			ntfs_mft_record_unmap(ni);
-			err = vnode_get(objid_o_ni->vn);
-			if (err) {
-				ntfs_error(vol->mp, "Failed to get index "
-						"vnode for $ObjId/$O.");
-				goto err;
-			}
+			vhold(objid_o_ni->vn);
+			/* 
+			 * FIXME: Error handling should be here for OS X's
+			 * vnode_get(), but FreeBSD's vhold() returns void.
+			 * Will have panic in case it fails.
+			 *
+			 * if (err) {
+			 * 	ntfs_error(vol->mp, "Failed to get index "
+			 * 			"vnode for $ObjId/$O.");
+			 * 	goto err;
+			 * }
+			 */ 
 			sx_xlock(&objid_o_ni->lock);
 			ictx = ntfs_index_ctx_get(objid_o_ni);
 			if (!ictx) {
@@ -4258,7 +4270,7 @@ restart_ictx:
 			}
 			ntfs_index_ctx_put(ictx);
 			sx_xunlock(&objid_o_ni->lock);
-			(void)vnode_put(objid_o_ni->vn);
+			vdrop(objid_o_ni->vn);
 			/*
 			 * Now get back the mft record so we can re-look up the
 			 * object id attribute so we can delete it.
@@ -4614,7 +4626,7 @@ iput_err:
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
 	sx_xunlock(&objid_o_ni->lock);
-	(void)vnode_put(objid_o_ni->vn);
+	vdrop(objid_o_ni->vn);
 	return err;
 }
 
@@ -6626,7 +6638,7 @@ retry:
 		cache_purge(ni->vn);
 		/* Release the vnode and try the create again. */
 		sx_xunlock(&ni->lock);
-		vnode_put(ni->vn);
+		vdrop(ni->vn);
 		goto retry;
 	}
 	/*
@@ -6682,7 +6694,7 @@ retry:
 	if (NInoNonResident(raw_ni))
 		NInoSetNonResident(ni);
 	sx_xunlock(&raw_ni->lock);
-	vnode_put(raw_ni->vn);
+	vdrop(raw_ni->vn);
 	/* Check for write errors. */
 	if (uio_resid(uio) && !err)
 		err = EIO;
@@ -6705,7 +6717,7 @@ err:
 				"chkdsk.", err2);
 		NVolSetErrors(dir_ni->vol);
 	}
-	vnode_put(ni->vn);
+	vdrop(ni->vn);
 	return err;
 }
 
@@ -6953,7 +6965,7 @@ static int ntfs_vnop_readlink(struct vnop_readlink_args *a)
 	/* Perform the actual read of the symbolic link data into the uio. */
 	err = ntfs_read(raw_ni, uio, 0, TRUE);
 	sx_sunlock(&raw_ni->lock);
-	vnode_put(raw_ni->vn);
+	vdrop(raw_ni->vn);
 	/*
 	 * If the read was partial, reset @uio pretending that the read never
 	 * happened unless we used up all the space in the uio and it was
@@ -7582,8 +7594,12 @@ do_next:
 	 */
 	sx_xlock(&vol->mftbmp_lock);
 	mftbmp_ni = vol->mftbmp_ni;
-	err = vnode_get(mftbmp_ni->vn);
-	if (err)
+	/*
+	 * FIXME: Always false statement in next IF because of replacing
+	 * OS X's vnode_get() with FreeBSD's vhold().
+ 	 */
+	vhold(mftbmp_ni->vn);
+	if (0)
 		ntfs_warning(vol->mp, "Failed to get vnode for $MFT/$BITMAP "
 				"(error %d) thus cannot release mft "
 				"record(s).  Run chkdsk to recover the lost "
@@ -7617,7 +7633,7 @@ do_next:
 			}
 		}
 		sx_sunlock(&mftbmp_ni->lock);
-		(void)vnode_put(mftbmp_ni->vn);
+		vdrop(mftbmp_ni->vn);
 	}
 	sx_xunlock(&vol->mftbmp_lock);
 	ntfs_debug("Done (deleted base inode).");
@@ -8475,7 +8491,7 @@ compressed:
 				ntfs_error(vol->mp, "ntfs_write_compressed() "
 						"failed (error %d).", err);
 			sx_xunlock(&raw_ni->lock);
-			(void)vnode_put(raw_ni->vn);
+			vdrop(raw_ni->vn);
 		}
 #endif
 	} else {
@@ -8912,7 +8928,7 @@ static int ntfs_vnop_getxattr(struct vnop_getxattr_args *a)
 		}
 	}
 	sx_sunlock(&ani->lock);
-	(void)vnode_put(ani->vn);
+	vdrop(ani->vn);
 err:
 	sx_sunlock(&ni->lock);
 	ntfs_debug("Done (error %d).", err);
@@ -9394,7 +9410,7 @@ rm_err:
 		}
 	}
 	sx_xunlock(&ani->lock);
-	(void)vnode_put(ani->vn);
+	vdrop(ani->vn);
 err:
 	sx_xunlock(&ni->lock);
 	ntfs_debug("Done (error %d).", err);
@@ -9666,7 +9682,7 @@ static int ntfs_vnop_removexattr(struct vnop_removexattr_args *a)
 	}
 	ntfs_debug("Done.");
 	sx_xunlock(&ani->lock);
-	(void)vnode_put(ani->vn);
+	vdrop(ani->vn);
 err:
 	sx_xunlock(&ni->lock);
 	return err;
@@ -9922,10 +9938,10 @@ static int ntfs_vnop_listxattr(struct vnop_listxattr_args *args)
 							"not exist.",
 							(unsigned long long)
 							ani->mft_no);
-				(void)vnode_put(ani->vn);
+				vdrop(ani->vn);
 				continue;
 			}
-			(void)vnode_put(ani->vn);
+			vdrop(ani->vn);
 		}
 		/*
 		 * If AFP_Resource named stream exists, i.e. the resource fork

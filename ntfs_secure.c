@@ -217,8 +217,12 @@ errno_t ntfs_next_security_id_init(ntfs_volume *vol, le32 *next_security_id)
 	ni = vol->secure_sii_ni;
 	if (!ni)
 		panic("%s(): !vol->secure_sii_ni\n", __FUNCTION__);
-	err = vnode_get(ni->vn);
-	if (err) {
+	/*
+	 * FIXME: Next IF statement always false because of 
+	 * replacing vnode_get() with vhold()
+	 */
+	vhold(ni->vn);
+	if (0) {
 		ntfs_error(vol->mp, "Failed to get vnode for "
 				"$Secure/$INDEX_ALLOCATION/$SII.");
 		return err;
@@ -305,7 +309,7 @@ errno_t ntfs_next_security_id_init(ntfs_volume *vol, le32 *next_security_id)
 		ntfs_attr_search_ctx_put(actx);
 		ntfs_mft_record_unmap(base_ni);
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 		ntfs_debug("Found next security_id 0x%x in index root.",
 				(unsigned)le32_to_cpu(*next_security_id));
 		return 0;
@@ -448,7 +452,7 @@ fast_descend_into_child_node:
 			*next_security_id = const_cpu_to_le32(0x100);
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 		sx_sunlock(&ni->lock);
-		(void)vnode_put(ni->vn);
+		vdrop(ni->vn);
 		ntfs_debug("Found next security_id 0x%x in index allocation.",
 				le32_to_cpu(*next_security_id));
 		return 0;
@@ -483,7 +487,7 @@ err:
 	if (m)
 		ntfs_mft_record_unmap(base_ni);
 	sx_sunlock(&ni->lock);
-	(void)vnode_put(ni->vn);
+	vdrop(ni->vn);
 	return err;
 idx_err:
 	ntfs_error(vol->mp, "Corrupt index.  Aborting lookup.");

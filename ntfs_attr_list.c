@@ -859,8 +859,7 @@ retry_map:
 				 * safely.
 				 */
 				if (err2 == ENOMEM) {
-					(void)thread_block(
-							THREAD_CONTINUE_NULL);
+					sched_relinquish(curthread);
 					goto retry_map;
 				}
 				ctx->is_error = 1;
@@ -2136,7 +2135,7 @@ retry_map:
 			 * reinit and/or put the search context safely.
 			 */
 			if (err2 == ENOMEM) {
-				(void)thread_block(THREAD_CONTINUE_NULL);
+				sched_relinquish(curthread);
 				goto retry_map;
 			}
 			ctx->is_error = 1;
