@@ -65,6 +65,23 @@ int vnode_isblk(vnode_t vp)
         return ((vp->v_type == VBLK)? 1 : 0);
 }
 
+/* is vnode_t a system vnode */
+int vnode_issystem(vnode_t vp)
+{
+        return ((vp->v_vflag & VV_SYSTEM)? 1 : 0);
+}
+
+/* is this vnode under recyle now */
+int vnode_isrecycled(vnode_t vp)
+{
+        int ret;
+
+        VI_LOCK(vp);
+        ret =  (vp->v_iflag & VI_DOOMED)? 1 : 0;
+        VI_UNLOCK(vp);
+        return(ret);
+}
+
 uint32_t buf_flags(buf_t bp) 
 {
         return ((bp->b_flags));

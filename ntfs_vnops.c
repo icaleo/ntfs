@@ -2476,10 +2476,12 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		err = EINVAL;
 		goto err;
 	}
+#if 0
 	if (vnode_isnocache(vn) || vnode_isnocache(raw_ni->vn))
 		ioflags |= IO_NOCACHE;
 	if (vnode_isnoreadahead(vn) || vnode_isnoreadahead(raw_ni->vn))
 		ioflags |= IO_RAOFF;
+#endif
 	align_mask = ni->compression_block_size - 1;
 	if (align_mask < PAGE_MASK)
 		align_mask = PAGE_MASK;

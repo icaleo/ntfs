@@ -271,12 +271,14 @@ compressed:
 				panic("%s(): Requested raw inode but got "
 						"non-raw one.\n", __FUNCTION__);
 			ioflags = 0;
+#if 0
 			if (vnode_isnocache(ni->vn) ||
 					vnode_isnocache(raw_ni->vn))
 				ioflags |= IO_NOCACHE;
 			if (vnode_isnoreadahead(ni->vn) ||
 					vnode_isnoreadahead(raw_ni->vn))
 				ioflags |= IO_RAOFF;
+#endif
 			err = ntfs_read_compressed(ni, raw_ni, attr_ofs, size,
 					kaddr + upl_ofs, NULL, ioflags);
 			if (err)
