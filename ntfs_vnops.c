@@ -706,16 +706,6 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	} else if (cn->cn_flags & ISDOTDOT) {
 		/* ".." is not cached. */
 		cn->cn_flags &= ~MAKEENTRY;
-		vn = vnode_getparent(dir_ni->vn);
-		if (vn) {
-			sx_sunlock(&dir_ni->lock);
-			ntfs_debug("Got \"..\" directory 0x%llx of directory "
-					"0x%llx.",
-					(unsigned long long)NTFS_I(vn)->mft_no,
-					(unsigned long long)dir_ni->mft_no);
-			*a->a_vpp = vn;
-			return 0;
-		}
 		/*
 		 * Look up a filename attribute in the mft record of the
 		 * directory @dir_ni and use its parent mft reference to run an
