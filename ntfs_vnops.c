@@ -578,6 +578,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	ino64_t mft_no;
 	unsigned long op;
 	struct componentname *name_cn, *cn;
+	struct ucred *cred;
 	ntfs_inode *ni, *dir_ni = NTFS_I(a->a_dvp);
 	vnode_t vn;
 	ntfs_volume *vol;
@@ -608,6 +609,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 	vol = dir_ni->vol;
 	name_cn = cn = a->a_cnp;
 	op = cn->cn_nameiop;
+	cred = cn->cn_cred;
 	ntfs_debug("Looking up %.*s in directory inode 0x%llx for %s, flags "
 			"0x%lx.", (int)cn->cn_namelen, cn->cn_nameptr,
 			(unsigned long long)dir_ni->mft_no,
@@ -712,7 +714,7 @@ static int ntfs_vnop_lookup(struct vnop_lookup_args *a)
 		 * ntfs_inode_get() on it to obtain an inode for "..".
 		 */
 		err = ntfs_inode_get_name_and_parent_mref(dir_ni, FALSE, &mref,
-				NULL);
+				NULL, cred);
 		sx_sunlock(&dir_ni->lock);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to obtain parent mft "
@@ -1037,14 +1039,17 @@ handle_dos_name:
 		goto err;
 	}
 	/* Update the vnode with the new name if it differs from the old one. */
-	old_name = vnode_getname(vn);
-	if (!old_name || (ni->link_count > 1 && ((long)strlen(old_name) !=
+	old_name = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
+	// FIXME: Do we need NULL terminated string in *vn_name ?
+	err = vn_vptocnp(&vn, cred, old_name, NTFS_MAX_NAME_LEN);
+	if (err || (ni->link_count > 1 && ((long)strlen(old_name) !=
 			res_size || bcmp(old_name, utf8_name, res_size)))) {
 		vnode_update_identity(vn, NULL, (char*)utf8_name, res_size, 0,
 				VNODE_UPDATE_NAME | VNODE_UPDATE_CACHE);
+		free(old_name, M_TEMP);
 	}
-	if (old_name)
-		vnode_putname(old_name);
+	if (err == 0)
+		free(old_name, M_TEMP);	
 	/*
 	 * Enter the name into the cache (if it is already there this is a
 	 * no-op) and prevent the caller from trying to add the name to the
@@ -1725,7 +1730,7 @@ static int ntfs_vnop_access(struct vnop_access_args *a)
  * @a contains:
  *	vnode_t a_vp;			vnode for which to return attributes
  *	struct vnode_attr *a_vap;	attributes to return and destination
- *	vfs_context_t a_context;
+ *	truct ucred *a_cred;
  *
  * Return the attributes described in @a_vap about the vnode @a_vp.  Some
  * attributes are intercepted by the VFS in getattrlist() and getvolattrlist()
@@ -1740,7 +1745,7 @@ static int ntfs_vnop_access(struct vnop_access_args *a)
  *
  * TODO: Implement more attributes.
  */
-static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
+static int ntfs_vnop_getattr(struct vop_getattr_args *a)
 {
 	MFT_REF parent_mref;
 	ino64_t mft_no;
@@ -1749,6 +1754,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 	ntfs_inode *ni, *base_ni;
 	ntfs_volume *vol;
 	const char *name;
+	struct ucred *cred;
 	FILE_ATTR_FLAGS file_attributes;
 	unsigned flags;
 	errno_t err;
@@ -1760,6 +1766,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
 		return 0;
 	}
+	cred = cn->cn_cred;
 	vol = ni->vol;
 	mft_no = ni->mft_no;
 	have_parent = name_is_done = is_root = FALSE;
@@ -1965,7 +1972,7 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 			if (VATTR_IS_ACTIVE(va, va_name))
 				name = va->va_name;
 			err = ntfs_inode_get_name_and_parent_mref(base_ni,
-					FALSE, &parent_mref, name);
+					FALSE, &parent_mref, name, cred);
 			if (err) {
 				ntfs_error(base_ni->vol->mp, "Failed to obtain "
 						"parent mft reference for "
@@ -2009,14 +2016,19 @@ static int ntfs_vnop_getattr(struct vnop_getattr_args *a)
 	 * name for them.
 	 */
 	if (!name_is_done && VATTR_IS_ACTIVE(va, va_name) && ni == base_ni) {
-		name = vnode_getname(base_ni->vn);
-		if (name) {
+		name = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
+		/*
+                 * FIXME: Do we need NULL terminated string in *name ?
+		 */ 
+                err = vn_vptocnp(&(base_ni->vn), cred, name, NTFS_MAX_NAME_LEN);
+		if (err == 0) {
 			(void)strlcpy(va->va_name, name, MAXPATHLEN - 1);
 			VATTR_SET_SUPPORTED(va, va_name);
-			(void)vnode_putname(name);
+			free(name, M_TEMP);
 		} else {
+			free(name, M_TEMP);
 			err = ntfs_inode_get_name_and_parent_mref(base_ni,
-					have_parent, &parent_mref, va->va_name);
+				have_parent, &parent_mref, va->va_name, cred);
 			if (err) {
 				ntfs_error(base_ni->vol->mp, "Failed to obtain "
 						"parent mft reference for "
@@ -6718,12 +6730,21 @@ err:
  * @a:		arguments to readdir function
  *
  * @a contains:
+ * 	OS X:
  *	vnode_t a_vp;		directory vnode to read directory entries from
  *	uio_t a_uio;		destination in which to return the entries
  *	int a_flags;		flags describing the entries to return
  *	int *a_eofflag;		return end of file status (can be NULL)
  *	int *a_numdirent;	return number of entries returned (can be NULL)
  *	vfs_context_t a_context;
+ *
+ *	FreeBSD:
+ *	struct vnode *vp;
+ *	struct uio *uio;
+ *	struct ucred *cred;
+ *	int *eofflag;
+ *	int *ncookies;
+ *	u_long **cookies;
  *
  * See ntfs_dir.c::ntfs_readdir() for a description of the implemented
  * features.  In addition to those described features VNOP_READDIR() should
@@ -6768,6 +6789,7 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 	user_ssize_t start_count;
 	ntfs_inode *dir_ni = NTFS_I(a->a_vp);
 	errno_t err;
+	struct ucred *cred;
 
 	if (!dir_ni) {
 		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
@@ -6791,6 +6813,7 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 				"flags are supported yet, sorry.");
 		return ENOTSUP;
 	}
+	cred = a->cred;
 	sx_slock(&dir_ni->lock);
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(dir_ni)) {
@@ -6801,7 +6824,7 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 		return ENOENT;
 	}
 	start_count = uio_resid(a->a_uio);
-	err = ntfs_readdir(dir_ni, a->a_uio, a->a_eofflag, a->a_numdirent);
+	err = ntfs_readdir(dir_ni, a->a_uio, a->a_eofflag, a->a_numdirent, cred);
 	/*
 	 * Update the last_access_time (atime) if something was read.
 	 *
@@ -10764,14 +10787,16 @@ static int ntfs_vnop_removenamedstream(struct vnop_removenamedstream_args *a)
 		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
 		return EINVAL;
 	}
-	vname = vnode_getname(svn);
+	vname = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
+	// FIXME: Do we need NULL terminated string in *old_name ?
+	err = vn_vptocnp(&svn, cred, vname, NTFS_MAX_NAME_LEN);
 	ntfs_debug("Entering for mft_no 0x%llx, stream mft_no 0x%llx, stream "
 			"name %s, flags 0x%x, stream vnode name %s.",
 			(unsigned long long)ni->mft_no,
 			(unsigned long long)sni->mft_no, name, a->a_flags,
 			vname ? vname : "not present");
 	if (vname)
-		(void)vnode_putname(vname);
+		free(vname, M_TEMP);
 	/*
 	 * Mac OS X only supports the resource fork stream.
 	 * Note that this comparison is case sensitive.

@@ -675,7 +675,7 @@ __private_extern__ errno_t ntfs_inode_sync(ntfs_inode *ni, const int sync,
 		const BOOL skip_mft_record_sync);
 
 __private_extern__ errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni,
-		BOOL have_parent, MFT_REF *mref, const char *name);
+		BOOL have_parent, MFT_REF *mref, const char *name, struct ucred *cred);
 
 __private_extern__ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni,
 		ntfs_inode *child_ni, BOOL *is_parent, ntfs_inode *forbid_ni);

@@ -529,8 +529,10 @@ retry:
 						__FUNCTION__,
 						(unsigned long long)mft_no);
 			old_parent_vn = vnode_getparent(vn);
-			old_name = vnode_getname(vn);
-			if (ni->link_count > 1 || !old_parent_vn || !old_name) {
+			old_name = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
+			// FIXME: Do we need NULL terminated string in *old_name ?
+			err = vn_vptocnp(&vn, cred, old_name, NTFS_MAX_NAME_LEN);
+			if (ni->link_count > 1 || !old_parent_vn || err) {
 				char *name = NULL;
 				int len, hash, flags;
 
@@ -568,7 +570,7 @@ retry:
 							name, len, hash, flags);
 			}
 			if (old_name)
-				(void)vnode_putname(old_name);
+				free(old_name, M_TEMP);
 			if (!parent_vn)
 				parent_vn = old_parent_vn;
 			if (cn && cn->cn_flags & MAKEENTRY) {
@@ -4200,7 +4202,7 @@ errno_t ntfs_inode_sync(ntfs_inode *ni, const int ioflags,
  * Return 0 on success and the error code on error.
  */
 errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni, BOOL have_parent,
-		MFT_REF *parent_mref, const char *name)
+		MFT_REF *parent_mref, const char *name, struct ucred *cred)
 {
 	MFT_REF mref;
 	ntfs_inode *base_ni;
@@ -4228,16 +4230,19 @@ errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni, BOOL have_parent,
 	if (link_count > 1) {
 		if (!name) {
 			const char *vn_name;
-
-			vn_name = vnode_getname(ni->vn);
-			if (vn_name) {
+			vn_name = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
+			/*
+			 * FIXME: Do we need NULL terminated string in *vn_name ?
+			 */ 
+			err = vn_vptocnp(&(ni->vn), cred, vn_name, NTFS_MAX_NAME_LEN);
+			if (err == 0) {
 				/* Convert the name from utf8 to Unicode. */
 				ntfs_name = ntfs_name_buf;
 				name_size = sizeof(ntfs_name_buf);
 				res_size = utf8_to_ntfs(ni->vol, (u8*)vn_name,
 						strlen(vn_name), &ntfs_name,
 						&name_size);
-				(void)vnode_putname(vn_name);
+				free(vn_name, M_TEMP);
 				/*
 				 * If we failed to convert the name, warn the
 				 * user about it and then continue execution
@@ -4257,7 +4262,8 @@ errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni, BOOL have_parent,
 					NVolSetErrors(ni->vol);
 					ntfs_name = NULL;
 				}
-			}
+			} else
+				free(vn_name, M_TEMP);
 		}
 	} else
 		have_parent = FALSE;

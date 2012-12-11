@@ -1035,7 +1035,7 @@ void ntfs_dirhints_put(ntfs_inode *ni, BOOL stale_only)
  * Locking: Caller must hold @dir_ni->lock.
  */
 errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio, int *eofflag,
-		int *numdirent)
+		int *numdirent, struct ucred *cred)
 {
 	off_t ofs;
 	ntfs_volume *vol;
@@ -1160,7 +1160,7 @@ errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio, int *eofflag,
 				 * parent mft reference for "..".
 				 */
 				err = ntfs_inode_get_name_and_parent_mref(
-						dir_ni, FALSE, &mref, NULL);
+					dir_ni, FALSE, &mref, NULL, cred);
 				if (err) {
 					ntfs_warning(vol->mp, "Skipping "
 							"emulated dirent for "
