@@ -60,3 +60,5 @@ struct statfs * vfs_statfs(mount_t mp);
 /* return a pointer to fs private data */
 void * vfs_fsprivate(mount_t mp);
 
+/* Vnode attributes check */
+#define VATTR_IS_ACTIVE(v, a) ((v)->a != VNOVAL)

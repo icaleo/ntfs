@@ -1109,7 +1109,7 @@ err:
  * Note we always create inode names in the POSIX namespace.
  */
 static errno_t ntfs_create(vnode_t dir_vn, vnode_t *vn,
-		struct componentname *cn, struct vnode_attr *va,
+		struct componentname *cn, struct vattr *va,
 		const BOOL lock)
 {
 	ntfs_inode *ni, *dir_ni = NTFS_I(dir_vn);
@@ -1206,23 +1206,17 @@ static errno_t ntfs_create(vnode_t dir_vn, vnode_t *vn,
 	}
 	va->va_mode |= VTTOIF(va->va_type);
 	/* If no create time is supplied default it to the current time. */
-	if (!VATTR_IS_ACTIVE(va, va_create_time))
-		nanotime(&va->va_create_time);
+	if (!VATTR_IS_ACTIVE(va, va_birthtime))
+		nanotime(&va->va_birthtime);
 	/*
 	 * Round the time down to the nearest 100-nano-second interval as
 	 * needed for NTFS.
 	 */
-	va->va_create_time.tv_nsec -= va->va_create_time.tv_nsec % 100;
+	va->va_birthtime.tv_nsec -= va->va_create_time.tv_nsec % 100;
 	/* Set the times in the temporary filename attribute. */
 	fn->last_access_time = fn->last_mft_change_time =
 			fn->last_data_change_time = fn->creation_time =
-			utc2ntfs(va->va_create_time);
-	/* Set the bits for all the supported fields at once. */
-	va->va_supported |=
-			VNODE_ATTR_BIT(va_mode) |
-			VNODE_ATTR_BIT(va_flags) |
-			VNODE_ATTR_BIT(va_create_time) |
-			VNODE_ATTR_BIT(va_type);
+			utc2ntfs(va->va_birthtime);
 again:
 	/* Lock the target directory and check that it has not been deleted. */
 	sx_xlock(&dir_ni->lock);
@@ -1502,11 +1496,10 @@ is_system:
  * @a:		arguments to create function
  *
  * @a contains:
- *	vnode_t a_dvp;			directory in which to create the file
- *	vnode_t *a_vpp;			destination pointer for the created file
- *	struct componentname *a_cnp;	name of the file to create
- *	struct vnode_attr *a_vap;	attributes to set on the created file
- *	vfs_context_t a_context;
+ *	vnode *dvp;			directory in which to create the file
+ *	vnode **vpp;			destination pointer for the created file
+ *	struct componentname *cnp;	name of the file to create
+ *	struct vattr *vap;		attributes to set on the created file
  *
  * Create a regular file with name as specified in @a->a_cnp in the directory
  * specified by the vnode @a->a_dvp.  Assign the attributes @a->a_vap to the
@@ -1516,19 +1509,19 @@ is_system:
  *
  * Note we always create filenames in the POSIX namespace.
  */
-static int ntfs_vnop_create(struct vnop_create_args *a)
+static int ntfs_vnop_create(struct vop_create_args *a)
 {
 	errno_t err;
 #ifdef DEBUG
-	ntfs_inode *ni = NTFS_I(a->a_dvp);
+	ntfs_inode *ni = NTFS_I(a->dvp);
 
 	if (ni)
 		ntfs_debug("Creating a file named %.*s in directory mft_no "
-				"0x%llx.", (int)a->a_cnp->cn_namelen,
-				a->a_cnp->cn_nameptr,
+				"0x%llx.", (int)a->cnp->cn_namelen,
+				a->cnp->cn_nameptr,
 				(unsigned long long)ni->mft_no);
 #endif
-	err = ntfs_create(a->a_dvp, a->a_vpp, a->a_cnp, a->a_vap, FALSE);
+	err = ntfs_create(a->dvp, a->vpp, a->cnp, a->vap, FALSE);
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
 }
@@ -1877,10 +1870,10 @@ static int ntfs_vnop_getattr(struct vop_getattr_args *a)
 			!(file_attributes & FILE_ATTR_ARCHIVE))
 		flags |= SF_ARCHIVED;
 	va->va_flags = flags;
-	va->va_create_time = base_ni->creation_time;
-	va->va_access_time = base_ni->last_access_time;
-	va->va_modify_time = base_ni->last_data_change_time;
-	va->va_change_time = base_ni->last_mft_change_time;
+	va->va_birthtime = base_ni->creation_time;
+	va->va_atime = base_ni->last_access_time;
+	va->va_mtime = base_ni->last_data_change_time;
+	va->va_ctime = base_ni->last_mft_change_time;
 	/*
 	 * NTFS does not distinguish between the inode and its hard links.
 	 *
@@ -1908,10 +1901,10 @@ static int ntfs_vnop_getattr(struct vop_getattr_args *a)
 			VNODE_ATTR_BIT(va_gid) |
 			VNODE_ATTR_BIT(va_mode) |
 			VNODE_ATTR_BIT(va_flags) |
-			VNODE_ATTR_BIT(va_create_time) |
-			VNODE_ATTR_BIT(va_access_time) |
-			VNODE_ATTR_BIT(va_modify_time) |
-			VNODE_ATTR_BIT(va_change_time) |
+			VNODE_ATTR_BIT(va_birthtime) |
+			VNODE_ATTR_BIT(va_atime) |
+			VNODE_ATTR_BIT(va_mtime) |
+			VNODE_ATTR_BIT(va_ctime) |
 			VNODE_ATTR_BIT(va_fileid) |
 			VNODE_ATTR_BIT(va_fsid) |
 			VNODE_ATTR_BIT(va_filerev) |
@@ -2307,14 +2300,14 @@ static int ntfs_vnop_setattr(struct vnop_setattr_args *a)
 			NInoSetDirtyFileAttributes(base_ni);
 		VATTR_SET_SUPPORTED(va, va_flags);
 	}
-	if (VATTR_IS_ACTIVE(va, va_create_time)) {
-		base_ni->creation_time = va->va_create_time;
-		VATTR_SET_SUPPORTED(va, va_create_time);
+	if (VATTR_IS_ACTIVE(va, va_birthtime)) {
+		base_ni->creation_time = va->va_birthtime;
+		VATTR_SET_SUPPORTED(va, va_birthtime);
 		dirty_times = TRUE;
 	}
-	if (VATTR_IS_ACTIVE(va, va_modify_time)) {
-		base_ni->last_data_change_time = va->va_modify_time;
-		VATTR_SET_SUPPORTED(va, va_modify_time);
+	if (VATTR_IS_ACTIVE(va, va_mtime)) {
+		base_ni->last_data_change_time = va->va_mtime;
+		VATTR_SET_SUPPORTED(va, va_mtime);
 		dirty_times = TRUE;
 		/*
 		 * The following comment came from the HFS code:
@@ -2340,23 +2333,23 @@ static int ntfs_vnop_setattr(struct vnop_setattr_args *a)
 		 * One salient point is that we only do the above if the
 		 * creation time is not being explicitly set already.
 		 */
-		if (!VATTR_IS_ACTIVE(va, va_create_time) &&
-				(va->va_modify_time.tv_sec <
+		if (!VATTR_IS_ACTIVE(va, va_birthtime) &&
+				(va->va_mtime.tv_sec <
 				base_ni->creation_time.tv_sec ||
-				(va->va_modify_time.tv_sec ==
+				(va->va_mtime.tv_sec ==
 				base_ni->creation_time.tv_sec &&
-				va->va_modify_time.tv_nsec <
+				va->va_mtime.tv_nsec <
 				base_ni->creation_time.tv_nsec)))
-			base_ni->creation_time = va->va_modify_time;
+			base_ni->creation_time = va->va_mtime;
 	}
-	if (VATTR_IS_ACTIVE(va, va_change_time)) {
-		base_ni->last_mft_change_time = va->va_change_time;
-		VATTR_SET_SUPPORTED(va, va_change_time);
+	if (VATTR_IS_ACTIVE(va, va_ctime)) {
+		base_ni->last_mft_change_time = va->va_ctime;
+		VATTR_SET_SUPPORTED(va, va_ctime);
 		dirty_times = TRUE;
 	}
-	if (VATTR_IS_ACTIVE(va, va_access_time)) {
-		base_ni->last_access_time = va->va_access_time;
-		VATTR_SET_SUPPORTED(va, va_access_time);
+	if (VATTR_IS_ACTIVE(va, va_atime)) {
+		base_ni->last_access_time = va->va_atime;
+		VATTR_SET_SUPPORTED(va, va_atime);
 		dirty_times = TRUE;
 	}
 	if (dirty_times)

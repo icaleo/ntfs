@@ -1970,7 +1970,7 @@ static void ntfs_index_root_attribute_insert(ntfs_volume *vol, MFT_RECORD *m,
  * We in particular use @va to distinguish what type of inode is being created 
  * (@va->va_type == VREG, VDIR, VLNK, VSOCK, VFIFO, VBLK, or VCHR,
  * respectively).  @va also gives us the creation_time to use
- * (@va->va_create_time) as well as the mode (@va->va_mode) and the file
+ * (@va->va_birthtime) as well as the mode (@va->va_mode) and the file
  * attributes (@va->va_flags).  And for block and character device special file
  * nodes @va->va_rdev specifies the device.
  *
@@ -2671,7 +2671,7 @@ retry:
 		a = (ATTR_RECORD*)((u8*)m + le16_to_cpu(m->attrs_offset));
 		/* Add the standard information attribute. */
 		ntfs_standard_info_attribute_insert(m, a, file_attrs,
-				security_id, &va->va_create_time);
+				security_id, &va->va_birthtime);
 		a = (ATTR_RECORD*)((u8*)a + le32_to_cpu(a->length));
 		/*
 		 * If @security_id is zero, add the security descriptor
@@ -2848,7 +2848,7 @@ retry:
 			NInoSetSparse(ni);
 		ni->last_access_time = ni->last_mft_change_time =
 				ni->last_data_change_time = ni->creation_time =
-				va->va_create_time;
+				va->va_birthtime;
 		/* Initialize the backup time and Finder info cache. */
 		ntfs_inode_afpinfo_cache(ni, NULL, 0);
 		/*

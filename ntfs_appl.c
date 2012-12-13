@@ -82,6 +82,12 @@ int vnode_isrecycled(vnode_t vp)
         return(ret);
 }
 
+/* returns FS specific node saved in vnode */
+void *vnode_fsnode(vnode_t vp)
+{
+	return (vp->v_data);
+}
+
 uint32_t buf_flags(buf_t bp) 
 {
         return ((bp->b_flags));
