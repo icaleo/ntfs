@@ -42,6 +42,7 @@
 #include <sys/uio.h>
 
 #include "ntfs.h"
+#include "ntfs_apple.h"
 #include "ntfs_inode.h"
 #include "ntfs_layout.h"
 #include "ntfs_types.h"

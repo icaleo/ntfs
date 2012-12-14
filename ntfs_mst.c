@@ -38,6 +38,7 @@
 #include <sys/errno.h>
 
 #include "ntfs.h"
+#include "ntfs_apple.h"
 #include "ntfs_endian.h"
 #include "ntfs_layout.h"
 #include "ntfs_mst.h"

@@ -106,6 +106,7 @@ typedef struct {
 } ntfs_runlist;
 
 #include "ntfs.h"
+#include "ntfs_apple.h"
 #include "ntfs_layout.h"
 #include "ntfs_volume.h"
 

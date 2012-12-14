@@ -56,6 +56,7 @@
 
 
 #include "ntfs.h"
+#include "ntfs_apple.h"
 #include "ntfs_debug.h"
 #include "ntfs_hash.h"
 #include "ntfs_inode.h"

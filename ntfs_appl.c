@@ -36,6 +36,7 @@
  */
 
 #include "ntfs.h"
+#include "ntfs_apple.h"
 #include "ntfs_attr.h"
 #include "ntfs_bitmap.h"
 #include "ntfs_compress.h"
