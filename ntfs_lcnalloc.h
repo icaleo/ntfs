@@ -39,7 +39,11 @@
 #ifndef _BSD_NTFS_LCNALLOC_H
 #define _BSD_NTFS_LCNALLOC_H
 
-
+#include <sys/errno.h>
+#include <sys/param.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
 
 #include "ntfs_attr.h"
 #include "ntfs_inode.h"

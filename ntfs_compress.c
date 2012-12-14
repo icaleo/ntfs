@@ -36,9 +36,15 @@
  */
 
 
+#include <sys/errno.h>
+#include <sys/ucred.h>
+#include <sys/uio.h>
+#include <sys/types.h>
 
+#include <string.h>
 
-
+#include <sys/malloc.h>
+#include <sys/lock.h>
 
 #include "ntfs.h"
 #include "ntfs_attr.h"

@@ -62,3 +62,16 @@ void * vfs_fsprivate(mount_t mp);
 
 /* Vnode attributes check */
 #define VATTR_IS_ACTIVE(v, a) ((v)->a != VNOVAL)
+
+struct statfs * vfs_statfs(mount_t mp);
+void * vfs_fsprivate(mount_t mp);
+int vnode_isreg(vnode_t vp);
+int vnode_ischr(vnode_t vp);
+int vnode_isblk(vnode_t vp);
+int vnode_issystem(vnode_t vp);
+int vnode_isrecycled(vnode_t vp);
+void *vnode_fsnode(vnode_t vp);
+daddr64_t buf_lblkno(buf_t bp);
+errno_t buf_map(buf_t bp, caddr_t *io_addr);
+errno_t buf_unmap(buf_t bp);
+

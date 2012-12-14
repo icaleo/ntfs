@@ -37,9 +37,22 @@
 
 
 
+#include <sys/cdefs.h>
 
+#include <sys/errno.h>
+#include <sys/kernel_types.h>
+#include <sys/queue.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/ucred.h>
+#include <sys/vnode.h>
 
+#include <sys/types.h>
+#include <sys/malloc.h>
 
+#include <machine/atomic.h>
+
+#include <string.h>
 
 #include "ntfs.h"
 #include "ntfs_attr.h"

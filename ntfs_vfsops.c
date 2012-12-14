@@ -35,6 +35,24 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/namei.h>
+#include <sys/priv.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/vnode.h>
+#include <sys/mount.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/conf.h>
+#include <sys/endian.h>
+#include <sys/fcntl.h>
+#include <sys/malloc.h>
+#include <sys/stat.h>
+
+#include <geom/geom.h>
+#include <geom/geom_vfs.h>
 
 #include <sys/types.h>
 #include <sys/lock.h>

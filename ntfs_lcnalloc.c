@@ -36,7 +36,20 @@
  */
 
 
+#include <sys/buf.h>
+#include <sys/errno.h>
+#include <sys/stat.h>
+#include <sys/ucred.h>
+#include <sys/vnode.h>
+#include <sys/param.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
 
+#include <sys/types.h>
+#include <sys/malloc.h>
+
+#include <string.h>
 
 
 #include "ntfs.h"

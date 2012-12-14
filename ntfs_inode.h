@@ -38,6 +38,16 @@
 #ifndef _BSD_NTFS_INODE_H
 #define _BSD_NTFS_INODE_H
 
+#include <sys/buf.h>
+#include <sys/errno.h>
+#include <sys/types.h>
+#include <sys/proc.h>
+#include <sys/queue.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/ucred.h>
+#include <sys/vnode.h>
+#include <sys/xattr.h>
 
 
 

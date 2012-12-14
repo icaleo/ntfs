@@ -39,6 +39,7 @@
 #ifndef _BSD_NTFS_ATTR_LIST_H
 #define _BSD_NTFS_ATTR_LIST_H
 
+#include <sys/errno.h>
 
 #include "ntfs_attr.h"
 #include "ntfs_endian.h"

@@ -39,7 +39,7 @@
 #ifndef _BSD_NTFS_COMPRESS_H
 #define _BSD_NTFS_COMPRESS_H
 
-
+#include <sys/errno.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_types.h"

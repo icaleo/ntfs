@@ -35,8 +35,9 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#include <sys/errno.h>
 
-
+#include <string.h>
 
 #include "ntfs_bitmap.h"
 #include "ntfs_debug.h"

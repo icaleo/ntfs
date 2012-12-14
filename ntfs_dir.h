@@ -38,6 +38,8 @@
 #ifndef _BSD_NTFS_DIR_H
 #define _BSD_NTFS_DIR_H
 
+#include <sys/errno.h>
+#include <sys/uio.h>
 
 #include "ntfs.h"
 #include "ntfs_inode.h"

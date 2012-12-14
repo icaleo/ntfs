@@ -38,6 +38,7 @@
 #ifndef _BSD_NTFS_TIME_H
 #define _BSD_NTFS_TIME_H
 
+#include <sys/time.h>
 
 #include "ntfs_endian.h"
 #include "ntfs_types.h"

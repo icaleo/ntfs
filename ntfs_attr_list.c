@@ -36,8 +36,10 @@
  */
 
 
+#include <sys/errno.h>
+#include <sys/malloc.h>
 
-
+#include <string.h>
 
 #include "ntfs.h"
 #include "ntfs_attr.h"

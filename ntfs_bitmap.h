@@ -38,6 +38,7 @@
 #ifndef _BSD_NTFS_BITMAP_H
 #define _BSD_NTFS_BITMAP_H
 
+#include <sys/errno.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_types.h"

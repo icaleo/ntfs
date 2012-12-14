@@ -38,7 +38,14 @@
 #ifndef _BSD_NTFS_VOLUME_H
 #define _BSD_NTFS_VOLUME_H
 
+#include <sys/mount.h>
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
 
+#include <machine/atomic.h>
 
 
 /* Forward declaration. */

@@ -36,6 +36,37 @@
  */
 
 
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/endian.h>
+#include <sys/priv.h>
+#include <sys/mount.h>
+#include <sys/unistd.h>
+#include <sys/time.h>
+#include <sys/vnode.h>
+#include <sys/namei.h>
+#include <sys/lockf.h>
+#include <sys/event.h>
+#include <sys/conf.h>
+#include <sys/file.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
+
+#include <sys/types.h>
+#include <sys/malloc.h>
+
+#include <vm/vm.h>
+#include <vm/vm_page.h>
+#include <vm/vm_object.h>
+#include <vm/vm_extern.h>
+#include <vm/vnode_pager.h>
+
 
 
 

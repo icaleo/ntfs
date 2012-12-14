@@ -36,8 +36,14 @@
  */
 
 
+#include <sys/errno.h>
+#include <sys/param.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
+#include <sys/malloc.h>
 
-
+#include <string.h>
 
 #include "ntfs.h"
 #include "ntfs_attr.h"

@@ -39,7 +39,15 @@
 #ifndef _BSD_NTFS_HASH_H
 #define _BSD_NTFS_HASH_H
 
+#include <sys/cdefs.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
+#include <sys/queue.h>
 
+#include <sys/param.h>
+#include <sys/lock.h>
+#include <sys/sx.h>
+#include <sys/mutex.h>
 
 #include "ntfs_inode.h"
 #include "ntfs_volume.h"

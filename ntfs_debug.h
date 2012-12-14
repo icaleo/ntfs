@@ -38,6 +38,7 @@
 #ifndef _BSD_NTFS_DEBUG_H
 #define _BSD_NTFS_DEBUG_H
 
+#include <sys/cdefs.h>
 
 #include "ntfs_runlist.h"
 

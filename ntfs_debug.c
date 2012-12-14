@@ -36,7 +36,16 @@
  */
 
 
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
+#include <sys/proc.h>
+#include <sys/sysctl.h>
 
+#include <stdarg.h>
+#include <string.h>
+
+#include <sys/lock.h>
 
 
 #include "ntfs.h"

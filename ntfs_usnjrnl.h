@@ -39,6 +39,7 @@
 #ifndef _BSD_NTFS_USNJRNL_H
 #define _BSD_NTFS_USNJRNL_H
 
+#include <sys/errno.h>
 
 #include "ntfs_types.h"
 #include "ntfs_endian.h"

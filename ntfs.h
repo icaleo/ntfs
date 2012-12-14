@@ -40,6 +40,10 @@
 
 #ifdef KERNEL
 
+#include <sys/mount.h>
+#include <sys/malloc.h>
+#include <sys/lock.h>
+
 
 /* The email address of the NTFS developers. */
 __private_extern__ const char ntfs_dev_email[];

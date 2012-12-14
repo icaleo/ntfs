@@ -36,7 +36,11 @@
  */
 
 
+#include <sys/errno.h>
+#include <sys/types.h>
+#include <sys/malloc.h>
 
+#include <string.h>
 
 #include "ntfs_debug.h"
 #include "ntfs_endian.h"

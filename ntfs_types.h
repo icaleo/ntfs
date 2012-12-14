@@ -38,7 +38,7 @@
 #ifndef _BSD_NTFS_TYPES_H
 #define _BSD_NTFS_TYPES_H
 
-
+#include <sys/types.h>
 
 /* Define our fixed size types. */
 typedef u_int8_t u8;

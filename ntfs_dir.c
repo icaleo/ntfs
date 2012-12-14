@@ -36,6 +36,18 @@
  */
 
 
+#include <sys/buf.h>
+#include <sys/param.h>
+#include <sys/dirent.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/ucred.h>
+#include <sys/uio.h>
+#include <sys/vnode.h>
+#include <sys/malloc.h>
+
+#include <string.h>
 
 
 

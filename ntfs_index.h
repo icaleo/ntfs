@@ -38,7 +38,10 @@
 #ifndef _BSD_NTFS_INDEX_H
 #define _BSD_NTFS_INDEX_H
 
+#include <sys/errno.h>
 
+#include <sys/types.h>
+#include <sys/malloc.h>
 
 
 /* Foward declaration. */

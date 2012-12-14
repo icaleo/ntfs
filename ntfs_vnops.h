@@ -38,6 +38,9 @@
 #ifndef _BSD_NTFS_VNOPS_H
 #define _BSD_NTFS_VNOPS_H
 
+#include <sys/buf.h>
+#include <sys/ucred.h>
+#include <sys/vnode.h>
 
 typedef int vnop_t(void *);
 
