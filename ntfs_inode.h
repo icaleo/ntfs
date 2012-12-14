@@ -59,6 +59,7 @@ struct _ntfs_dirhint;
 typedef LIST_HEAD(, _ntfs_inode) ntfs_inode_list_head;
 typedef LIST_ENTRY(_ntfs_inode) ntfs_inode_list_entry;
 
+#include "ntfs_appl.h"
 #include "ntfs_layout.h"
 #include "ntfs_runlist.h"
 #include "ntfs_sfm.h"
