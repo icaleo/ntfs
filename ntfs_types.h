@@ -49,6 +49,7 @@ typedef int8_t s8;
 typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
+typedef int64_t daddr64_t;
 
 /*
  * Define our fixed size, little-endian types.  Note we define the signed types
