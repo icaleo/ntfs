@@ -38,7 +38,7 @@
 #ifndef _BSD_NTFS_RUNLIST_H
 #define _BSD_NTFS_RUNLIST_H
 
-
+#include <sys/sx.h>
 
 #include "ntfs_types.h"
 
