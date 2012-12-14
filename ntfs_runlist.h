@@ -40,7 +40,10 @@
 
 #include <sys/sx.h>
 
+
 #include "ntfs_types.h"
+#include "ntfs_appl.h"
+
 
 /* These definitions need to be before any of the other ntfs_*.h includes. */
 
