@@ -35,6 +35,8 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
+#ifndef _BSD_NTFS_APPL_H
+#define _BSD_NTFS_APPL_H
 
 typedef int errno_t;
 
@@ -73,3 +75,4 @@ daddr64_t buf_lblkno(buf_t bp);
 errno_t buf_map(buf_t bp, caddr_t *io_addr);
 errno_t buf_unmap(buf_t bp);
 
+#endif /* _BSD_NTFS_APPL_H */
