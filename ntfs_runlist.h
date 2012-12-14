@@ -147,42 +147,42 @@ typedef enum {
 	LCN_EIO			= -5,
 } LCN_SPECIAL_VALUES;
 
-__private_extern__ errno_t ntfs_rl_merge(ntfs_runlist *dst_runlist,
+extern errno_t ntfs_rl_merge(ntfs_runlist *dst_runlist,
 		ntfs_runlist *src_runlist);
 
-__private_extern__ errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol,
+extern errno_t ntfs_mapping_pairs_decompress(ntfs_volume *vol,
 		const ATTR_RECORD *a, ntfs_runlist *runlist);
 
-__private_extern__ LCN ntfs_rl_vcn_to_lcn(const ntfs_rl_element *rl,
+extern LCN ntfs_rl_vcn_to_lcn(const ntfs_rl_element *rl,
 		const VCN vcn, s64 *clusters);
 
-__private_extern__ ntfs_rl_element *ntfs_rl_find_vcn_nolock(
+extern ntfs_rl_element *ntfs_rl_find_vcn_nolock(
 		ntfs_rl_element *rl, const VCN vcn);
 
-__private_extern__ errno_t ntfs_get_size_for_mapping_pairs(
+extern errno_t ntfs_get_size_for_mapping_pairs(
 		const ntfs_volume *vol, const ntfs_rl_element *rl,
 		const VCN first_vcn, const VCN last_vcn, unsigned *mp_size);
 
-__private_extern__ errno_t ntfs_mapping_pairs_build(const ntfs_volume *vol,
+extern errno_t ntfs_mapping_pairs_build(const ntfs_volume *vol,
 		s8 *dst, const unsigned dst_len, const ntfs_rl_element *rl,
 		const VCN first_vcn, const VCN last_vcn, VCN *const stop_vcn);
 
-__private_extern__ errno_t ntfs_rl_truncate_nolock(const ntfs_volume *vol,
+extern errno_t ntfs_rl_truncate_nolock(const ntfs_volume *vol,
 		ntfs_runlist *const runlist, const s64 new_length);
 
-__private_extern__ errno_t ntfs_rl_punch_nolock(const ntfs_volume *vol,
+extern errno_t ntfs_rl_punch_nolock(const ntfs_volume *vol,
 		ntfs_runlist *runlist, const VCN start_vcn, const s64 len);
 
-__private_extern__ errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *rl,
+extern errno_t ntfs_rl_read(ntfs_volume *vol, ntfs_runlist *rl,
 		u8 *dst, const s64 size, const s64 initialized_size);
 
-__private_extern__ errno_t ntfs_rl_write(ntfs_volume *vol, u8 *src,
+extern errno_t ntfs_rl_write(ntfs_volume *vol, u8 *src,
 		const s64 size, ntfs_runlist *runlist, s64 ofs, const s64 cnt);
 
-__private_extern__ errno_t ntfs_rl_set(ntfs_volume *vol,
+extern errno_t ntfs_rl_set(ntfs_volume *vol,
 		const ntfs_rl_element *rl, const u8 val);
 
-__private_extern__ s64 ntfs_rl_get_nr_real_clusters(ntfs_runlist *runlist,
+extern s64 ntfs_rl_get_nr_real_clusters(ntfs_runlist *runlist,
 		const VCN start_vcn, s64 cnt);
 
 #endif /* !_BSD_NTFS_RUNLIST_H */
