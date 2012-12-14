@@ -42,10 +42,10 @@
 #include "ntfs_inode.h"
 #include "ntfs_types.h"
 
-__private_extern__ int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size,
+extern int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size,
 		upl_t upl, upl_offset_t upl_ofs, int flags);
 
-__private_extern__ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs,
+extern errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs,
 		upl_t *upl, upl_page_info_array_t *pl, u8 **kaddr,
 		const BOOL uptodate, const BOOL rw);
 
@@ -108,10 +108,10 @@ static inline errno_t ntfs_page_grab(ntfs_inode *ni, s64 ofs, upl_t *upl,
 	return ntfs_page_map_ext(ni, ofs, upl, pl, kaddr, FALSE, rw);
 }
 
-__private_extern__ void ntfs_page_unmap(ntfs_inode *ni, upl_t upl,
+extern void ntfs_page_unmap(ntfs_inode *ni, upl_t upl,
 		upl_page_info_array_t pl, const BOOL mark_dirty);
 
-__private_extern__ void ntfs_page_dump(ntfs_inode *ni, upl_t upl,
+extern void ntfs_page_dump(ntfs_inode *ni, upl_t upl,
 		upl_page_info_array_t pl);
 
 #endif /* !_BSD_NTFS_PAGE_H */

@@ -45,15 +45,15 @@
 /* Forward declaration so we do not have to include <sys/mount.h> here. */
 struct mount;
 
-__private_extern__ void ntfs_debug_init(void);
-__private_extern__ void ntfs_debug_deinit(void);
+extern void ntfs_debug_init(void);
+extern void ntfs_debug_deinit(void);
 
-__private_extern__ void __ntfs_warning(const char *function,
+extern void __ntfs_warning(const char *function,
 		struct mount *mp, const char *fmt, ...) __printflike(3, 4);
 #define ntfs_warning(mp, fmt, a...)	\
 		__ntfs_warning(__FUNCTION__, mp, fmt, ##a)
 
-__private_extern__ void __ntfs_error(const char *function,
+extern void __ntfs_error(const char *function,
 		struct mount *mp, const char *fmt, ...) __printflike(3, 4);
 #define ntfs_error(mp, fmt, a...)	\
 		__ntfs_error(__FUNCTION__, mp, fmt, ##a)
@@ -68,14 +68,14 @@ __private_extern__ void __ntfs_error(const char *function,
  * ntfs_debug() writes a message to the console but only if the driver was
  * compiled with -DDEBUG.  Otherwise, the call turns into a NOP.
  */
-__private_extern__ void __ntfs_debug(const char *file, int line,
+extern void __ntfs_debug(const char *file, int line,
 		const char *function, const char *fmt, ...)
 		__printflike(4, 5);
 #define ntfs_debug(fmt, a...)		\
 		__ntfs_debug(__FILE__, __LINE__, __FUNCTION__, fmt, ##a)
 
-__private_extern__ void ntfs_debug_runlist_dump(const ntfs_runlist *rl);
-__private_extern__ void ntfs_debug_attr_list_dump(const u8 *al,
+extern void ntfs_debug_runlist_dump(const ntfs_runlist *rl);
+extern void ntfs_debug_attr_list_dump(const u8 *al,
 		const unsigned size);
 
 #else /* !DEBUG */

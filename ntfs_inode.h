@@ -501,9 +501,9 @@ struct _ntfs_attr {
 	BOOL raw;
 };
 
-__private_extern__ BOOL ntfs_inode_test(ntfs_inode *ni, const ntfs_attr *na);
+extern BOOL ntfs_inode_test(ntfs_inode *ni, const ntfs_attr *na);
 
-__private_extern__ errno_t ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni,
+extern errno_t ntfs_inode_init(ntfs_volume *vol, ntfs_inode *ni,
 		const ntfs_attr *na);
 
 /**
@@ -559,19 +559,19 @@ static inline void ntfs_inode_unlock_alloc(ntfs_inode *ni)
 
 #define ntfs_inode_add_vnode(ni, is_system, parent_vn, cn)	\
 	ntfs_inode_add_vnode_attr(ni, is_system, parent_vn, cn, FALSE/*isstream*/)
-__private_extern__ errno_t ntfs_inode_add_vnode_attr(ntfs_inode *ni,
+extern errno_t ntfs_inode_add_vnode_attr(ntfs_inode *ni,
 		const BOOL is_system, vnode_t parent_vn,
 		struct componentname *cn, BOOL isstream);
 
-__private_extern__ errno_t ntfs_inode_get(ntfs_volume *vol, ino64_t mft_no,
+extern errno_t ntfs_inode_get(ntfs_volume *vol, ino64_t mft_no,
 		const BOOL is_system, const lck_rw_type_t lock,
 		ntfs_inode **nni, vnode_t parent_vn, struct componentname *cn);
 
-__private_extern__ errno_t ntfs_attr_inode_lookup(ntfs_inode *base_ni,
+extern errno_t ntfs_attr_inode_lookup(ntfs_inode *base_ni,
 		ATTR_TYPE type, ntfschar *name, u32 name_len, const BOOL raw,
 		ntfs_inode **nni);
 
-__private_extern__ errno_t ntfs_attr_inode_get_or_create(ntfs_inode *base_ni,
+extern errno_t ntfs_attr_inode_get_or_create(ntfs_inode *base_ni,
 		ATTR_TYPE type, ntfschar *name, u32 name_len,
 		const BOOL is_system, const BOOL raw, const int options,
 		const lck_rw_type_t lock, ntfs_inode **nni);
@@ -663,31 +663,31 @@ static inline errno_t ntfs_raw_inode_get(ntfs_inode *ni,
 			ni->name_len, FALSE, TRUE, XATTR_REPLACE, lock, nni);
 }
 
-__private_extern__ errno_t ntfs_index_inode_get(ntfs_inode *base_ni,
+extern errno_t ntfs_index_inode_get(ntfs_inode *base_ni,
 		ntfschar *name, u32 name_len, const BOOL is_system,
 		ntfs_inode **nni);
 
-__private_extern__ errno_t ntfs_extent_inode_get(ntfs_inode *base_ni,
+extern errno_t ntfs_extent_inode_get(ntfs_inode *base_ni,
 		MFT_REF mref, ntfs_inode **ext_ni);
 
-__private_extern__ void ntfs_inode_afpinfo_cache(ntfs_inode *ni, AFPINFO *afp,
+extern void ntfs_inode_afpinfo_cache(ntfs_inode *ni, AFPINFO *afp,
 		const unsigned afp_size);
 
-__private_extern__ errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni);
+extern errno_t ntfs_inode_afpinfo_read(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni);
+extern errno_t ntfs_inode_afpinfo_write(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_inode_inactive(ntfs_inode *ni);
+extern errno_t ntfs_inode_inactive(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_inode_reclaim(ntfs_inode *ni);
+extern errno_t ntfs_inode_reclaim(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_inode_sync(ntfs_inode *ni, const int sync,
+extern errno_t ntfs_inode_sync(ntfs_inode *ni, const int sync,
 		const BOOL skip_mft_record_sync);
 
-__private_extern__ errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni,
+extern errno_t ntfs_inode_get_name_and_parent_mref(ntfs_inode *ni,
 		BOOL have_parent, MFT_REF *mref, const char *name, struct ucred *cred);
 
-__private_extern__ errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni,
+extern errno_t ntfs_inode_is_parent(ntfs_inode *parent_ni,
 		ntfs_inode *child_ni, BOOL *is_parent, ntfs_inode *forbid_ni);
 
 #endif /* !_BSD_NTFS_INODE_H */

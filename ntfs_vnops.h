@@ -44,10 +44,10 @@
 
 typedef int vnop_t(void *);
 
-__private_extern__ vnop_t **ntfs_vnodeop_p;
+extern vnop_t **ntfs_vnodeop_p;
 
 extern struct vop_vector ntfs_vnodeops;
 
-__private_extern__ int ntfs_cluster_iodone(buf_t cbp, void *arg __unused);
+extern int ntfs_cluster_iodone(buf_t cbp, void *arg __unused);
 
 #endif /* !_BSD_NTFS_VNOPS_H */

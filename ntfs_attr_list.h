@@ -47,19 +47,19 @@
 #include "ntfs_layout.h"
 #include "ntfs_types.h"
 
-__private_extern__ errno_t ntfs_attr_list_is_needed(ntfs_inode *ni,
+extern errno_t ntfs_attr_list_is_needed(ntfs_inode *ni,
 		ATTR_LIST_ENTRY *skip_entry, BOOL *attr_list_is_needed);
 
-__private_extern__ errno_t ntfs_attr_list_delete(ntfs_inode *ni,
+extern errno_t ntfs_attr_list_delete(ntfs_inode *ni,
 		ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_list_add(ntfs_inode *ni, MFT_RECORD *m,
+extern errno_t ntfs_attr_list_add(ntfs_inode *ni, MFT_RECORD *m,
 		ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_list_sync_shrink(ntfs_inode *ni,
+extern errno_t ntfs_attr_list_sync_shrink(ntfs_inode *ni,
 		const unsigned start_ofs, ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_list_sync_extend(ntfs_inode *base_ni,
+extern errno_t ntfs_attr_list_sync_extend(ntfs_inode *base_ni,
 		MFT_RECORD *base_m, unsigned al_ofs,
 		ntfs_attr_search_ctx *ctx);
 
@@ -88,7 +88,7 @@ static inline int ntfs_attr_list_sync(ntfs_inode *ni, const unsigned start_ofs,
 	return ntfs_attr_list_sync_shrink(ni, start_ofs, ctx);
 }
 
-__private_extern__ void ntfs_attr_list_entries_delete(ntfs_inode *ni,
+extern void ntfs_attr_list_entries_delete(ntfs_inode *ni,
 		ATTR_LIST_ENTRY *start_entry, ATTR_LIST_ENTRY *end_entry);
 
 /**

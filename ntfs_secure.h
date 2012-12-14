@@ -45,10 +45,10 @@
 #include "ntfs_layout.h"
 #include "ntfs_volume.h"
 
-__private_extern__ SDS_ENTRY *ntfs_file_sds_entry;
-__private_extern__ SDS_ENTRY *ntfs_dir_sds_entry;
-__private_extern__ SDS_ENTRY *ntfs_file_sds_entry_old;
-__private_extern__ SDS_ENTRY *ntfs_dir_sds_entry_old;
+extern SDS_ENTRY *ntfs_file_sds_entry;
+extern SDS_ENTRY *ntfs_dir_sds_entry;
+extern SDS_ENTRY *ntfs_file_sds_entry_old;
+extern SDS_ENTRY *ntfs_dir_sds_entry_old;
 
 /**
  * ntfs_rol32 - rotate a value to the left
@@ -93,12 +93,12 @@ static inline le32 ntfs_security_hash(SECURITY_DESCRIPTOR_RELATIVE *sd,
 	return cpu_to_le32(hash);
 }
 
-__private_extern__ errno_t ntfs_default_sds_entries_init(void);
+extern errno_t ntfs_default_sds_entries_init(void);
 
-__private_extern__ errno_t ntfs_next_security_id_init(ntfs_volume *vol,
+extern errno_t ntfs_next_security_id_init(ntfs_volume *vol,
 		le32 *next_security_id);
 
-__private_extern__ errno_t ntfs_default_security_id_init(ntfs_volume *vol,
+extern errno_t ntfs_default_security_id_init(ntfs_volume *vol,
 		struct vnode_attr *va);
 
 #endif /* _BSD_NTFS_SECURE_H */

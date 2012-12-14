@@ -44,11 +44,11 @@
 #include "ntfs_layout.h"
 #include "ntfs_types.h"
 
-__private_extern__ errno_t ntfs_mst_fixup_post_read(NTFS_RECORD *b,
+extern errno_t ntfs_mst_fixup_post_read(NTFS_RECORD *b,
 		const u32 size);
 
-__private_extern__ errno_t ntfs_mst_fixup_pre_write(NTFS_RECORD *b,
+extern errno_t ntfs_mst_fixup_pre_write(NTFS_RECORD *b,
 		const u32 size);
-__private_extern__ void ntfs_mst_fixup_post_write(NTFS_RECORD *b);
+extern void ntfs_mst_fixup_post_write(NTFS_RECORD *b);
 
 #endif /* !_BSD_NTFS_MST_H */

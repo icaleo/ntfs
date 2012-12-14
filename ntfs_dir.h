@@ -61,21 +61,21 @@ typedef struct {
 } ntfs_dir_lookup_name;
 
 /* The little endian Unicode string $I30 as a global constant. */
-__private_extern__ ntfschar I30[5];
+extern ntfschar I30[5];
 
-__private_extern__ errno_t ntfs_lookup_inode_by_name(ntfs_inode *dir_ni,
+extern errno_t ntfs_lookup_inode_by_name(ntfs_inode *dir_ni,
 		const ntfschar *uname, const signed uname_len,
 		MFT_REF *res_mref, ntfs_dir_lookup_name **res_name);
 
-__private_extern__ errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio,
+extern errno_t ntfs_readdir(ntfs_inode *dir_ni, uio_t uio,
 		int *eofflag, int *numdirent);
 
-__private_extern__ errno_t ntfs_dir_is_empty(ntfs_inode *dir_ni);
+extern errno_t ntfs_dir_is_empty(ntfs_inode *dir_ni);
 
-__private_extern__ errno_t ntfs_dir_entry_delete(ntfs_inode *dir_ni,
+extern errno_t ntfs_dir_entry_delete(ntfs_inode *dir_ni,
 		ntfs_inode *ni, const FILENAME_ATTR *fn, const u32 fn_len);
 
-__private_extern__ errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni,
+extern errno_t ntfs_dir_entry_add(ntfs_inode *dir_ni,
 		const FILENAME_ATTR *fn, const u32 fn_len,
 		const leMFT_REF mref);
 
@@ -106,6 +106,6 @@ typedef struct _ntfs_dirhint ntfs_dirhint;
 #define NTFS_DIR_TAG_MASK 0xfc000000
 #define NTFS_DIR_TAG_SHIFT 26
 
-__private_extern__ void ntfs_dirhints_put(ntfs_inode *ni, BOOL stale_only);
+extern void ntfs_dirhints_put(ntfs_inode *ni, BOOL stale_only);
 
 #endif /* !_BSD_NTFS_DIR_H */

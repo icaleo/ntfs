@@ -58,15 +58,15 @@ typedef enum {
 	LAST_ZONE	= 1,	/* For sanity checking. */
 } NTFS_CLUSTER_ALLOCATION_ZONES;
 
-__private_extern__ errno_t ntfs_cluster_alloc(ntfs_volume *vol,
+extern errno_t ntfs_cluster_alloc(ntfs_volume *vol,
 		const VCN start_vcn, const s64 count, const LCN start_lcn,
 		const NTFS_CLUSTER_ALLOCATION_ZONES zone,
 		const BOOL is_extension, ntfs_runlist *runlist);
 
-__private_extern__ errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol,
+extern errno_t ntfs_cluster_free_from_rl(ntfs_volume *vol,
 		ntfs_rl_element *rl, const VCN start_vcn, s64 count,
 		s64 *nr_freed);
-__private_extern__ errno_t ntfs_cluster_free(ntfs_inode *ni,
+extern errno_t ntfs_cluster_free(ntfs_inode *ni,
 		const VCN start_vcn, s64 count, ntfs_attr_search_ctx *ctx,
 		s64 *nr_freed);
 

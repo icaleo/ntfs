@@ -268,12 +268,12 @@ static inline void ntfs_index_ctx_init(ntfs_index_context *ictx,
 	};
 }
 
-__private_extern__ ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *idx_ni);
+extern ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *idx_ni);
 
-__private_extern__ void ntfs_index_ctx_put_reuse_single(
+extern void ntfs_index_ctx_put_reuse_single(
 		ntfs_index_context *ictx);
 
-__private_extern__ void ntfs_index_ctx_put_reuse(ntfs_index_context *ictx);
+extern void ntfs_index_ctx_put_reuse(ntfs_index_context *ictx);
 
 /**
  * ntfs_index_ctx_reinit - re-initialize an index context
@@ -354,27 +354,27 @@ static inline void ntfs_index_ctx_put(ntfs_index_context *ictx)
 	ntfs_index_ctx_free(ictx);
 }
 
-__private_extern__ void ntfs_index_ctx_unlock(ntfs_index_context *ictx);
+extern void ntfs_index_ctx_unlock(ntfs_index_context *ictx);
 
-__private_extern__ errno_t ntfs_index_ctx_relock(ntfs_index_context *ictx);
+extern errno_t ntfs_index_ctx_relock(ntfs_index_context *ictx);
 
-__private_extern__ errno_t ntfs_index_lookup(const void *key,
+extern errno_t ntfs_index_lookup(const void *key,
 		const int key_len, ntfs_index_context **ictx);
 
-__private_extern__ errno_t ntfs_index_lookup_by_position(const s64 pos,
+extern errno_t ntfs_index_lookup_by_position(const s64 pos,
 		const int key_len, ntfs_index_context **index_ctx);
 
-__private_extern__ errno_t ntfs_index_lookup_next(
+extern errno_t ntfs_index_lookup_next(
 		ntfs_index_context **index_ctx);
 
-__private_extern__ void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx);
+extern void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx);
 
-__private_extern__ errno_t ntfs_index_move_root_to_allocation_block(
+extern errno_t ntfs_index_move_root_to_allocation_block(
 		ntfs_index_context *ictx);
 
-__private_extern__ int ntfs_index_entry_delete(ntfs_index_context *ictx);
+extern int ntfs_index_entry_delete(ntfs_index_context *ictx);
 
-__private_extern__ errno_t ntfs_index_entry_add_or_node_split(
+extern errno_t ntfs_index_entry_add_or_node_split(
 		ntfs_index_context *ictx, const BOOL split_only,
 		u32 entry_size, const void *key, const u32 key_len,
 		const void *data, const u32 data_len);

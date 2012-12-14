@@ -43,22 +43,22 @@
 #include "ntfs_types.h"
 #include "ntfs_volume.h"
 
-__private_extern__ BOOL ntfs_are_names_equal(const ntfschar *s1, size_t s1_len,
+extern BOOL ntfs_are_names_equal(const ntfschar *s1, size_t s1_len,
 		const ntfschar *s2, size_t s2_len, const BOOL case_sensitive,
 		const ntfschar *upcase, const u32 upcase_len);
 
-__private_extern__ int ntfs_collate_names(const ntfschar *name1,
+extern int ntfs_collate_names(const ntfschar *name1,
 		const u32 name1_len, const ntfschar *name2,
 		const u32 name2_len, const int err_val,
 		const BOOL case_sensitive, const ntfschar *upcase,
 		const u32 upcase_len);
 
-__private_extern__ int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2,
+extern int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2,
 		size_t n);
-__private_extern__ int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2,
+extern int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2,
 		size_t n, const ntfschar *upcase, const u32 upcase_size);
 
-__private_extern__ void ntfs_upcase_name(ntfschar *name, u32 name_len,
+extern void ntfs_upcase_name(ntfschar *name, u32 name_len,
 		const ntfschar *upcase, const u32 upcase_len);
 
 static inline void ntfs_file_upcase_value(FILENAME_ATTR *filename_attr,
@@ -80,13 +80,13 @@ static inline int ntfs_file_compare_values(FILENAME_ATTR *filename_attr1,
 			err_val, case_sensitive, upcase, upcase_len);
 }
 
-__private_extern__ signed ntfs_to_utf8(const ntfs_volume *vol,
+extern signed ntfs_to_utf8(const ntfs_volume *vol,
 		const ntfschar *ins, const size_t ins_size,
 		u8 **outs, size_t *outs_size);
 
-__private_extern__ signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
+extern signed utf8_to_ntfs(const ntfs_volume *vol, const u8 *ins,
 		const size_t ins_size, ntfschar **outs, size_t *outs_size);
 
-__private_extern__ void ntfs_upcase_table_generate(ntfschar *uc, int uc_size);
+extern void ntfs_upcase_table_generate(ntfschar *uc, int uc_size);
 
 #endif /* !_BSD_NTFS_UNISTR_H */

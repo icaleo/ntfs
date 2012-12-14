@@ -214,6 +214,6 @@ typedef struct {
 /* sizeof() = 60 (0x3c) bytes */
 } __attribute__((__packed__)) USN_RECORD;
 
-__private_extern__ errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol);
+extern errno_t ntfs_usnjrnl_stamp(ntfs_volume *vol);
 
 #endif /* _BSD_NTFS_USNJRNL_H */

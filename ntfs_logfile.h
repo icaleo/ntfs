@@ -312,12 +312,12 @@ typedef struct {
 /* sizeof() = 160 (0xa0) bytes */
 } __attribute__((__packed__)) LOG_CLIENT_RECORD;
 
-__private_extern__ errno_t ntfs_logfile_check(ntfs_inode *ni,
+extern errno_t ntfs_logfile_check(ntfs_inode *ni,
 		RESTART_PAGE_HEADER **rp);
 
-__private_extern__ BOOL ntfs_logfile_is_clean(ntfs_inode *ni,
+extern BOOL ntfs_logfile_is_clean(ntfs_inode *ni,
 		const RESTART_PAGE_HEADER *rp);
 
-__private_extern__ errno_t ntfs_logfile_empty(ntfs_inode *ni);
+extern errno_t ntfs_logfile_empty(ntfs_inode *ni);
 
 #endif /* !_BSD_NTFS_LOGFILE_H */

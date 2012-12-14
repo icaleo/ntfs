@@ -43,7 +43,7 @@
 #include "ntfs_inode.h"
 #include "ntfs_types.h"
 
-__private_extern__ errno_t __ntfs_bitmap_set_bits_in_run(ntfs_inode *ni,
+extern errno_t __ntfs_bitmap_set_bits_in_run(ntfs_inode *ni,
 		const s64 start_bit, const s64 count, const u8 value,
 		const BOOL is_rollback);
 

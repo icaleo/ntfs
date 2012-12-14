@@ -45,7 +45,7 @@
 #include "ntfs_types.h"
 #include "ntfs_volume.h"
 
-__private_extern__ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni,
+extern errno_t ntfs_mft_record_map_ext(ntfs_inode *ni,
 		MFT_RECORD **m, const BOOL mft_is_locked);
 
 /**
@@ -67,9 +67,9 @@ static inline errno_t ntfs_mft_record_map(ntfs_inode *ni, MFT_RECORD **m)
 	return ntfs_mft_record_map_ext(ni, m, FALSE); 
 }
 
-__private_extern__ void ntfs_mft_record_unmap(ntfs_inode *ni);
+extern void ntfs_mft_record_unmap(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_extent_mft_record_map_ext(ntfs_inode *base_ni,
+extern errno_t ntfs_extent_mft_record_map_ext(ntfs_inode *base_ni,
 		MFT_REF mref, ntfs_inode **nni, MFT_RECORD **nm,
 		const BOOL mft_is_locked);
 
@@ -102,17 +102,17 @@ static inline void ntfs_extent_mft_record_unmap(ntfs_inode *ni)
 	ntfs_mft_record_unmap(ni);
 }
 
-__private_extern__ errno_t ntfs_mft_record_sync(ntfs_inode *ni);
+extern errno_t ntfs_mft_record_sync(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_mft_mirror_sync(ntfs_volume *vol,
+extern errno_t ntfs_mft_mirror_sync(ntfs_volume *vol,
 		const s64 rec_no, const MFT_RECORD *m, const BOOL sync);
 
-__private_extern__ errno_t ntfs_mft_record_alloc(ntfs_volume *vol,
+extern errno_t ntfs_mft_record_alloc(ntfs_volume *vol,
 		struct vnode_attr *va, struct componentname *cn,
 		ntfs_inode *base_ni, ntfs_inode **new_ni, MFT_RECORD **new_m,
 		ATTR_RECORD **new_a);
 
-__private_extern__ errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni,
+extern errno_t ntfs_extent_mft_record_free(ntfs_inode *base_ni,
 		ntfs_inode *ni, MFT_RECORD *m);
 
 #endif /* !_BSD_NTFS_MFT_H */

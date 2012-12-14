@@ -58,7 +58,7 @@ static inline BOOL ntfs_is_collation_rule_supported(COLLATION_RULE cr) {
 	return FALSE;
 }
 
-__private_extern__ int ntfs_collate(ntfs_volume *vol, COLLATION_RULE cr,
+extern int ntfs_collate(ntfs_volume *vol, COLLATION_RULE cr,
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len);
 

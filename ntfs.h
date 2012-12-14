@@ -46,14 +46,14 @@
 
 
 /* The email address of the NTFS developers. */
-__private_extern__ const char ntfs_dev_email[];
-__private_extern__ const char ntfs_please_email[];
+extern const char ntfs_dev_email[];
+extern const char ntfs_please_email[];
 
 
 /*
  * A tag for allocation and freeing of memory (defined in ntfs_vfsops.c).
  */
-__private_extern__ OSMallocTag ntfs_malloc_tag;
+extern OSMallocTag ntfs_malloc_tag;
 
 #include "ntfs_volume.h"
 
@@ -68,7 +68,7 @@ static inline ntfs_volume *NTFS_MP(mount_t mp)
 	return (ntfs_volume*)vfs_fsprivate(mp);
 }
 
-__private_extern__ void ntfs_do_postponed_release(ntfs_volume *vol);
+extern void ntfs_do_postponed_release(ntfs_volume *vol);
 
 #endif /* KERNEL */
 

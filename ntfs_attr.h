@@ -54,17 +54,17 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
  * when looking up attributes to specify that we want the unnamed attribute as
  * opposed to any attribute or a specific named attribute.
  */
-__private_extern__ ntfschar AT_UNNAMED[1];
+extern ntfschar AT_UNNAMED[1];
 
-__private_extern__ errno_t ntfs_attr_map_runlist(ntfs_inode *ni);
+extern errno_t ntfs_attr_map_runlist(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_map_runlist_nolock(ntfs_inode *ni, VCN vcn,
+extern errno_t ntfs_map_runlist_nolock(ntfs_inode *ni, VCN vcn,
 		ntfs_attr_search_ctx *ctx);
 
-__private_extern__ LCN ntfs_attr_vcn_to_lcn_nolock(ntfs_inode *ni,
+extern LCN ntfs_attr_vcn_to_lcn_nolock(ntfs_inode *ni,
 		const VCN vcn, const BOOL write_locked, s64 *clusters);
 
-__private_extern__ errno_t ntfs_attr_find_vcn_nolock(ntfs_inode *ni,
+extern errno_t ntfs_attr_find_vcn_nolock(ntfs_inode *ni,
 		const VCN vcn, ntfs_rl_element **run,
 		ntfs_attr_search_ctx *ctx);
 
@@ -162,85 +162,85 @@ static inline void ntfs_attr_search_ctx_init(ntfs_attr_search_ctx *ctx,
 	ctx->is_first = 1;
 }
 
-__private_extern__ void ntfs_attr_search_ctx_reinit(ntfs_attr_search_ctx *ctx);
-__private_extern__ ntfs_attr_search_ctx *ntfs_attr_search_ctx_get(
+extern void ntfs_attr_search_ctx_reinit(ntfs_attr_search_ctx *ctx);
+extern ntfs_attr_search_ctx *ntfs_attr_search_ctx_get(
 		ntfs_inode *ni, MFT_RECORD *m);
-__private_extern__ void ntfs_attr_search_ctx_put(ntfs_attr_search_ctx *ctx);
+extern void ntfs_attr_search_ctx_put(ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_find_in_mft_record(const ATTR_TYPE type,
+extern errno_t ntfs_attr_find_in_mft_record(const ATTR_TYPE type,
 		const ntfschar *name, const u32 name_len,
 		const void *val, const u32 val_len, ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_lookup(const ATTR_TYPE type,
+extern errno_t ntfs_attr_lookup(const ATTR_TYPE type,
 		const ntfschar *name, const u32 name_len, const VCN lowest_vcn,
 		const void *val, const u32 val_len, ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_size_bounds_check(const ntfs_volume *vol,
+extern errno_t ntfs_attr_size_bounds_check(const ntfs_volume *vol,
 		const ATTR_TYPE type, const s64 size);
 
-__private_extern__ errno_t ntfs_attr_can_be_resident(const ntfs_volume *vol,
+extern errno_t ntfs_attr_can_be_resident(const ntfs_volume *vol,
 		const ATTR_TYPE type);
 
-__private_extern__ BOOL ntfs_attr_record_is_only_one(MFT_RECORD *m,
+extern BOOL ntfs_attr_record_is_only_one(MFT_RECORD *m,
 		ATTR_RECORD *a);
 
-__private_extern__ void ntfs_attr_record_delete_internal(MFT_RECORD *m,
+extern void ntfs_attr_record_delete_internal(MFT_RECORD *m,
 		ATTR_RECORD *a);
-__private_extern__ errno_t ntfs_attr_record_delete(ntfs_inode *base_ni,
+extern errno_t ntfs_attr_record_delete(ntfs_inode *base_ni,
 		ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_record_make_space(MFT_RECORD *m,
+extern errno_t ntfs_attr_record_make_space(MFT_RECORD *m,
 		ATTR_RECORD *a, u32 size);
 
-__private_extern__ errno_t ntfs_attr_record_resize(MFT_RECORD *m,
+extern errno_t ntfs_attr_record_resize(MFT_RECORD *m,
 		ATTR_RECORD *a, u32 new_size);
 
-__private_extern__ errno_t ntfs_attr_mapping_pairs_update(ntfs_inode *base_ni,
+extern errno_t ntfs_attr_mapping_pairs_update(ntfs_inode *base_ni,
 		ntfs_inode *ni, VCN first_vcn, VCN last_vcn,
 		ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_resident_attr_record_insert_internal(
+extern errno_t ntfs_resident_attr_record_insert_internal(
 		MFT_RECORD *m, ATTR_RECORD *a, const ATTR_TYPE type,
 		const ntfschar *name, const u8 name_len, const u32 val_len);
-__private_extern__ errno_t ntfs_resident_attr_record_insert(ntfs_inode *ni,
+extern errno_t ntfs_resident_attr_record_insert(ntfs_inode *ni,
 		ntfs_attr_search_ctx *ctx, const ATTR_TYPE type,
 		const ntfschar *name, const u8 name_len,
 		const void *val, const u32 val_len);
 
-__private_extern__ errno_t ntfs_resident_attr_value_resize(MFT_RECORD *m,
+extern errno_t ntfs_resident_attr_value_resize(MFT_RECORD *m,
 		ATTR_RECORD *a, const u32 new_size);
 
-__private_extern__ errno_t ntfs_attr_make_non_resident(ntfs_inode *ni);
+extern errno_t ntfs_attr_make_non_resident(ntfs_inode *ni);
 
-__private_extern__ errno_t ntfs_attr_record_move_for_attr_list_attribute(
+extern errno_t ntfs_attr_record_move_for_attr_list_attribute(
 		ntfs_attr_search_ctx *al_ctx, ATTR_LIST_ENTRY *al_entry,
 		ntfs_attr_search_ctx *ctx, BOOL *remap_needed);
 
-__private_extern__ errno_t ntfs_attr_record_move(ntfs_attr_search_ctx *ctx);
+extern errno_t ntfs_attr_record_move(ntfs_attr_search_ctx *ctx);
 
-__private_extern__ errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni,
+extern errno_t ntfs_attr_set_initialized_size(ntfs_inode *ni,
 		s64 new_init_size);
 
-__private_extern__ errno_t ntfs_attr_extend_initialized(ntfs_inode *ni,
+extern errno_t ntfs_attr_extend_initialized(ntfs_inode *ni,
 		const s64 new_init_size);
 
-__private_extern__ errno_t ntfs_attr_instantiate_holes(ntfs_inode *ni,
+extern errno_t ntfs_attr_instantiate_holes(ntfs_inode *ni,
 		s64 start, s64 end, s64 *new_end, BOOL atomic);
 
-__private_extern__ errno_t ntfs_attr_extend_allocation(ntfs_inode *ni,
+extern errno_t ntfs_attr_extend_allocation(ntfs_inode *ni,
 		s64 new_alloc_size, const s64 new_data_size,
 		const s64 data_start, ntfs_index_context *ictx,
 		s64 *dst_alloc_size, const BOOL atomic);
 
-__private_extern__ errno_t ntfs_attr_resize(ntfs_inode *ni, s64 new_size,
+extern errno_t ntfs_attr_resize(ntfs_inode *ni, s64 new_size,
 		int ioflags, ntfs_index_context *ictx);
 
-__private_extern__ errno_t ntfs_attr_set(ntfs_inode *ni, s64 ofs,
+extern errno_t ntfs_attr_set(ntfs_inode *ni, s64 ofs,
 		const s64 cnt, const u8 val);
 
-__private_extern__ errno_t ntfs_resident_attr_read(ntfs_inode *ni,
+extern errno_t ntfs_resident_attr_read(ntfs_inode *ni,
 		const s64 ofs, const u32 cnt, u8 *buf);
-__private_extern__ errno_t ntfs_resident_attr_write(ntfs_inode *ni, u8 *buf,
+extern errno_t ntfs_resident_attr_write(ntfs_inode *ni, u8 *buf,
 		u32 cnt, const s64 ofs);
 
 #endif /* !_BSD_NTFS_ATTR_H */

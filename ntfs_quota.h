@@ -43,6 +43,6 @@
 #include "ntfs_types.h"
 #include "ntfs_volume.h"
 
-__private_extern__ errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol);
+extern errno_t ntfs_quotas_mark_out_of_date(ntfs_volume *vol);
 
 #endif /* _BSD_NTFS_QUOTA_H */

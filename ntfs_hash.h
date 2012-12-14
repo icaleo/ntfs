@@ -52,14 +52,14 @@
 #include "ntfs_inode.h"
 #include "ntfs_volume.h"
 
-__private_extern__ struct mtx ntfs_inode_hash_lock;
+extern struct mtx ntfs_inode_hash_lock;
 
-__private_extern__ errno_t ntfs_inode_hash_init(void);
-__private_extern__ void ntfs_inode_hash_deinit(void);
+extern errno_t ntfs_inode_hash_init(void);
+extern void ntfs_inode_hash_deinit(void);
 
-__private_extern__ ntfs_inode *ntfs_inode_hash_lookup(ntfs_volume *vol,
+extern ntfs_inode *ntfs_inode_hash_lookup(ntfs_volume *vol,
 		const ntfs_attr *na);
-__private_extern__ ntfs_inode *ntfs_inode_hash_get(ntfs_volume *vol,
+extern ntfs_inode *ntfs_inode_hash_get(ntfs_volume *vol,
 		const ntfs_attr *na);
 
 /**
@@ -73,6 +73,6 @@ static inline void ntfs_inode_hash_rm_nolock(ntfs_inode *ni)
 	LIST_REMOVE(ni, hash);
 }
 
-__private_extern__ void ntfs_inode_hash_rm(ntfs_inode *ni);
+extern void ntfs_inode_hash_rm(ntfs_inode *ni);
 
 #endif /* !_BSD_NTFS_HASH_H */
