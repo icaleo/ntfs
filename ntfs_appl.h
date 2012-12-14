@@ -46,8 +46,6 @@ typedef struct buf * buf_t;
 
 typedef struct uio * uio_t;
 
-typedef char * caddr_t;        /* address of a (signed) char */
-
 typedef unsigned int     lck_rw_type_t;
 
 #define LCK_RW_TYPE_SHARED                      0x01
