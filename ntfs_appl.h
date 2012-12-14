@@ -63,6 +63,10 @@ void * vfs_fsprivate(mount_t mp);
 /* Vnode attributes check */
 #define VATTR_IS_ACTIVE(v, a) ((v)->a != VNOVAL)
 
+/* Options for setxattr calls */
+#define XATTR_CREATE     0x0002     /* set the value, fail if attr already exists */
+#define XATTR_REPLACE    0x0004     /* set the value, fail if attr does not exist */
+
 struct statfs * vfs_statfs(mount_t mp);
 void * vfs_fsprivate(mount_t mp);
 int vnode_isreg(vnode_t vp);
