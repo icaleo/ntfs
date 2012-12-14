@@ -44,7 +44,7 @@
 #include <string.h>
 
 #include "ntfs.h"
-#include "ntfs_apple.h"
+#include "ntfs_appl.h"
 #include "ntfs_attr.h"
 #include "ntfs_attr_list.h"
 #include "ntfs_debug.h"

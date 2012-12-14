@@ -49,7 +49,7 @@
 
 
 #include "ntfs.h"
-#include "ntfs_apple.h"
+#include "ntfs_appl.h"
 #include "ntfs_debug.h"
 #include "ntfs_runlist.h"
 
