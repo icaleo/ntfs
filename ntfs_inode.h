@@ -47,7 +47,6 @@
 #include <sys/types.h>
 #include <sys/ucred.h>
 #include <sys/vnode.h>
-#include <sys/xattr.h>
 
 
 
