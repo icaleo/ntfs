@@ -67,8 +67,6 @@ void * vfs_fsprivate(mount_t mp);
 #define XATTR_CREATE     0x0002     /* set the value, fail if attr already exists */
 #define XATTR_REPLACE    0x0004     /* set the value, fail if attr does not exist */
 
-struct statfs * vfs_statfs(mount_t mp);
-void * vfs_fsprivate(mount_t mp);
 int vnode_isreg(vnode_t vp);
 int vnode_ischr(vnode_t vp);
 int vnode_isblk(vnode_t vp);
