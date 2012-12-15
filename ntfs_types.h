@@ -51,8 +51,6 @@ typedef int32_t s32;
 typedef int64_t s64;
 
 
-#define INT32_MIN        (-2147483647-1)
-#define INT32_MAX        +2147483647
 typedef int64_t daddr64_t;
 typedef __uint64_t ino64_t;
 
