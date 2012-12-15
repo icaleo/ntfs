@@ -6,6 +6,7 @@ KMOD=	ntfs
 SRCS=	vnode_if.h \
 	ntfs_appl.c \
 	ntfs_attr.c \
+	ntfs_attr.h \
 	ntfs_attr_list.c \
 	ntfs_bitmap.c \
 	ntfs_collate.c \

@@ -73,6 +73,7 @@ int vnode_isblk(vnode_t vp);
 int vnode_issystem(vnode_t vp);
 int vnode_isrecycled(vnode_t vp);
 void *vnode_fsnode(vnode_t vp);
+uint32_t buf_flags(buf_t bp);
 daddr64_t buf_lblkno(buf_t bp);
 errno_t buf_map(buf_t bp, caddr_t *io_addr);
 errno_t buf_unmap(buf_t bp);
