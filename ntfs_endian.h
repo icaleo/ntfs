@@ -39,6 +39,7 @@
 #define _BSD_NTFS_ENDIAN_H
 
 #include <sys/types.h>
+#include <sys/endian.h>
 #include <machine/atomic.h>
 
 #include "ntfs_types.h"
