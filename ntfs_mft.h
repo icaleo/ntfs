@@ -108,7 +108,7 @@ extern errno_t ntfs_mft_mirror_sync(ntfs_volume *vol,
 		const s64 rec_no, const MFT_RECORD *m, const BOOL sync);
 
 extern errno_t ntfs_mft_record_alloc(ntfs_volume *vol,
-		struct vnode_attr *va, struct componentname *cn,
+		struct vattr *va, struct componentname *cn,
 		ntfs_inode *base_ni, ntfs_inode **new_ni, MFT_RECORD **new_m,
 		ATTR_RECORD **new_a);
 

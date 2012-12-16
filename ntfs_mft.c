@@ -1874,7 +1874,7 @@ static void ntfs_standard_info_attribute_insert(MFT_RECORD *m, ATTR_RECORD *a,
  * This function cannot fail.
  */
 static void ntfs_sd_attribute_insert(ntfs_volume *vol, MFT_RECORD *m,
-		ATTR_RECORD *a, const struct vnode_attr *va)
+		ATTR_RECORD *a, const struct vattr *va)
 {
 	SDS_ENTRY *sds;
 	u32 sd_size;
@@ -2069,7 +2069,7 @@ static void ntfs_index_root_attribute_insert(ntfs_volume *vol, MFT_RECORD *m,
  * easier because otherwise there might be circular invocations of functions
  * when reading the bitmap.
  */
-errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vnode_attr *va,
+errno_t ntfs_mft_record_alloc(ntfs_volume *vol, struct vattr *va,
 		struct componentname *cn, ntfs_inode *base_ni,
 		ntfs_inode **new_ni, MFT_RECORD **new_m,
 		ATTR_RECORD **new_a)
