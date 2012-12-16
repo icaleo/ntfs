@@ -52,6 +52,7 @@
 #include <sys/mutex.h>
 
 #include <sys/lock.h>
+#include <sys/sched.h>
 
 
 #include <sys/errno.h>

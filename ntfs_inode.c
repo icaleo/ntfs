@@ -46,7 +46,7 @@
 #include <sys/stat.h>
 #include <sys/ucred.h>
 #include <sys/vnode.h>
-
+#include <sys/sched.h>
 #include <sys/types.h>
 #include <sys/malloc.h>
 

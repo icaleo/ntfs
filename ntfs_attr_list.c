@@ -38,6 +38,7 @@
 
 #include <sys/errno.h>
 #include <sys/malloc.h>
+#include <sys/sched.h>
 
 #include <string.h>
 
