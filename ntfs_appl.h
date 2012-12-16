@@ -38,6 +38,8 @@
 #ifndef _BSD_NTFS_APPL_H
 #define _BSD_NTFS_APPL_H
 
+#include "ntfs_types.h"
+
 typedef int errno_t;
 
 typedef struct mount * mount_t;

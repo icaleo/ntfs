@@ -35,28 +35,28 @@
  * http://developer.apple.com/opensource/licenses/gpl-2.txt.
  */
 
-#include "ntfs.h"
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/namei.h>
+#include <sys/priv.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/vnode.h>
+#include <sys/mount.h>
+#include <sys/bio.h>
+#include <sys/buf.h>
+#include <sys/conf.h>
+#include <sys/endian.h>
+#include <sys/fcntl.h>
+#include <sys/malloc.h>
+#include <sys/stat.h>
+#include <sys/mutex.h>
+
+#include <sys/lock.h>
+
 #include "ntfs_appl.h"
-#include "ntfs_attr.h"
-#include "ntfs_bitmap.h"
-#include "ntfs_compress.h"
-#include "ntfs_debug.h"
-#include "ntfs_dir.h"
+#include "ntfs_types.h"
 #include "ntfs_endian.h"
-#include "ntfs_hash.h"
-#include "ntfs_inode.h"
-#include "ntfs_layout.h"
-#include "ntfs_lcnalloc.h"
-#include "ntfs_mft.h"
-#include "ntfs_mst.h"
-#include "ntfs_page.h"
-#include "ntfs_sfm.h"
-#include "ntfs_time.h"
-#include "ntfs_unistr.h"
-#include "ntfs_vnops.h"
-#include "ntfs_volume.h"
-
-
 
 /* return a pointer to the RO vfs_statfs associated with mount_t */
 struct statfs * vfs_statfs(mount_t mp)
