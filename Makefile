@@ -29,3 +29,5 @@ SRCS=	vnode_if.h \
 	ntfs_vnops.c
 
 .include <bsd.kmod.mk>
+
+CFLAGS+= -fms-extensions
