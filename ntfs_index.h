@@ -53,6 +53,8 @@ typedef struct _ntfs_index_context ntfs_index_context;
 #include "ntfs_layout.h"
 #include "ntfs_types.h"
 
+MALLOC_DECLARE(M_NTFS);
+
 /**
  * @up:		pointer to index context located directly above in the tree
  * @down:	pointer to index context located directly below in the tree
