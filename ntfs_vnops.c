@@ -7874,12 +7874,10 @@ static int ntfs_vnop_allocate(struct vnop_allocate_args *a)
  *
  * @a contains:
  *	vnode_t a_vp;		vnode whose data to read into the page range
- *	upl_t a_pl;		page list describing destination page range
- *	upl_offset_t a_pl_offset; byte offset into page list at which to start
- *	off_t a_f_offset;	byte offset in the vnode at which to start
- *	size_t a_size;		number of bytes to read from the vnode
- *	int a_flags;		flags further describing the pagein request
- *	vfs_context_t a_context;
+ *	vm_page_t *a_m;
+ *	int a_count;
+ *	int a_reqpage;
+ *	vm_ooffset_t a_offset;	
  *
  * Read @a->a_size bytes from the vnode @a-a_vp, starting at byte offset
  * @a->a_f_offset into the vnode, into the range of pages specified by the page
