@@ -3836,51 +3836,6 @@ static int ntfs_vnop_write(struct vnop_write_args *a)
 }
 
 /**
- * ntfs_vnop_ioctl -
- *
- */
-static int ntfs_vnop_ioctl(struct vnop_ioctl_args *a)
-{
-	errno_t err;
-
-	ntfs_debug("Entering.");
-	// TODO:
-	err = ENOTSUP;
-	ntfs_debug("Done (error %d).", (int)err);
-	return err;
-}
-
-/**
- * ntfs_vnop_select -
- *
- */
-static int ntfs_vnop_select(struct vnop_select_args *a)
-{
-	errno_t err;
-
-	ntfs_debug("Entering.");
-	// TODO:
-	err = ENOTSUP;
-	ntfs_debug("Done (error %d).", (int)err);
-	return err;
-}
-
-/**
- * ntfs_vnop_exchange -
- *
- */
-static int ntfs_vnop_exchange(struct vnop_exchange_args *a)
-{
-	errno_t err;
-
-	ntfs_debug("Entering.");
-	// TODO:
-	err = ENOTSUP;
-	ntfs_debug("Done (error %d).", (int)err);
-	return err;
-}
-
-/**
  * ntfs_vnop_fsync - synchronize a vnode's in-core state with that on disk
  * @a:		arguments to fsync function
  *
@@ -6773,22 +6728,6 @@ static int ntfs_vnop_readdir(struct vnop_readdir_args *a)
 }
 
 /**
- * ntfs_vnop_readdirattr -
- *
- */
-static int ntfs_vnop_readdirattr(struct vnop_readdirattr_args *a)
-{
-	errno_t err;
-
-	ntfs_debug("Entering.");
-	(void)nop_readdirattr(a);
-	// TODO:
-	err = ENOTSUP;
-	ntfs_debug("Done (error %d).", (int)err);
-	return err;
-}
-
-/**
  * ntfs_vnop_readlink - read the contents of a symbolic link
  * @a:		arguments to readlink function
  *
@@ -7755,21 +7694,6 @@ static int ntfs_vnop_pathconf(struct vnop_pathconf_args *a)
 	}
 	if (ni)
 		sx_sunlock(&ni->lock);
-	ntfs_debug("Done (error %d).", (int)err);
-	return err;
-}
-
-/**
- * ntfs_vnop_allocate -
- */
-static int ntfs_vnop_allocate(struct vnop_allocate_args *a)
-{
-	errno_t err;
-
-	ntfs_debug("Entering.");
-	// TODO:
-	(void)nop_allocate(a);
-	err = ENOTSUP;
 	ntfs_debug("Done (error %d).", (int)err);
 	return err;
 }
@@ -9382,112 +9306,6 @@ err:
 }
 
 /**
- * ntfs_vnop_blktooff - map a logical block number to its byte offset
- * @a:		arguments to blktooff function
- *
- * @a contains:
- *	vnode_t a_vp;		vnode to which the logical block number belongs
- *	daddr64_t a_lblkno;	logical block number to map
- *	off_t *a_offset;	destination for returning the result
- *
- * Map the logical block number @a->a_lblkno belonging to the vnode @a->a_vp to
- * the corresponding byte offset, i.e. the offset in the vnode in bytes and
- * return the result in @a->a_offset.
- *
- * Return 0 on success and EINVAL if no vnode was specified in @a->a_vp.
- */
-static int ntfs_vnop_blktooff(struct vnop_blktooff_args *a)
-{
-	ntfs_inode *ni;
-	ntfs_volume *vol;
-	unsigned block_size_shift;
-
-	if (!a->a_vp) {
-		ntfs_warning(NULL, "Called with NULL vnode!");
-		return EINVAL;
-	}
-	ni = NTFS_I(a->a_vp);
-	if (!ni) {
-		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
-		return EINVAL;
-	}
-	if (S_ISDIR(ni->mode)) {
-		ntfs_error(ni->vol->mp, "Called for directory vnode.");
-		return EINVAL;
-	}
-	ntfs_debug("Entering for logical block 0x%llx, mft_no 0x%llx, type "
-			"0x%x, name_len 0x%x.", (unsigned long long)a->a_lblkno,
-			(unsigned long long)ni->mft_no, le32_to_cpu(ni->type),
-			(unsigned)ni->name_len);
-	vol = ni->vol;
-	block_size_shift = PAGE_SHIFT;
-	/*
-	 * For $MFT/$DATA and $MFTMirr/$DATA the logical block number is the
-	 * mft record number and the block size is the mft record size which is
-	 * also in @ni->block_size{,_shift}.
-	 */
-	if (ni == vol->mft_ni || ni == vol->mftmirr_ni)
-		block_size_shift = ni->block_size_shift;
-	*a->a_offset = a->a_lblkno << block_size_shift;
-	ntfs_debug("Done (byte offset 0x%llx).",
-			(unsigned long long)*a->a_offset);
-	return 0;
-}
-
-/**
- * ntfs_vnop_offtoblk - map a byte offset to its logical block number
- * @a:		arguments to offtoblk function
- *
- * @a contains:
- *	vnode_t a_vp;		vnode to which the byte offset belongs
- *	off_t a_offset;		byte offset to map
- *	daddr64_t *a_lblkno;	destination for returning the result
- *
- * Map the byte offset @a->a_offset belonging to the vnode @a->a_vp to the
- * corresponding logical block number, i.e. the offset in the vnode in units of
- * the vnode block size and return the result in @a->a_lblkno.
- *
- * Return 0 on success and EINVAL if no vnode was specified in @a->a_vp.
- */
-static int ntfs_vnop_offtoblk(struct vnop_offtoblk_args *a)
-{
-	ntfs_inode *ni;
-	ntfs_volume *vol;
-	unsigned block_size_shift;
-
-	if (!a->a_vp) {
-		ntfs_warning(NULL, "Called with NULL vnode.");
-		return EINVAL;
-	}
-	ni = NTFS_I(a->a_vp);
-	if (!ni) {
-		ntfs_debug("Entered with NULL ntfs_inode, aborting.");
-		return EINVAL;
-	}
-	if (S_ISDIR(ni->mode)) {
-		ntfs_error(ni->vol->mp, "Called for directory vnode.");
-		return EINVAL;
-	}
-	ntfs_debug("Entering for byte offset 0x%llx, mft_no 0x%llx, type "
-			"0x%x, name_len 0x%x.", (unsigned long long)a->a_offset,
-			(unsigned long long)ni->mft_no, le32_to_cpu(ni->type),
-			(unsigned)ni->name_len);
-	vol = ni->vol;
-	block_size_shift = PAGE_SHIFT;
-	/*
-	 * For $MFT/$DATA and $MFTMirr/$DATA the logical block number is the
-	 * mft record number and the block size is the mft record size which is
-	 * also in @ni->block_size{,_shift}.
-	 */
-	if (ni == vol->mft_ni || ni == vol->mftmirr_ni)
-		block_size_shift = ni->block_size_shift;
-	*a->a_lblkno = a->a_offset >> block_size_shift;
-	ntfs_debug("Done (logical block 0x%llx).",
-			(unsigned long long)*a->a_lblkno);
-	return 0;
-}
-
-/**
  * ntfs_vnop_blockmap - map a file offset to its physical block number
  * @a:		arguments to blockmap function
  *
@@ -9844,9 +9662,6 @@ struct vop_vector ntfs_vnodeops = {
 	.vop_setattr =			ntfs_vnop_setattr,
 	.vop_read =			ntfs_vnop_read,
 	.vop_write =			ntfs_vnop_write,
-	.vop_ioctl =			ntfs_vnop_ioctl,
-	.vop_select =			ntfs_vnop_select,
-	.vop_exchange =			ntfs_vnop_exchange,
 	.vop_fsync =			ntfs_vnop_fsync,
 	.vop_remove =			ntfs_vnop_remove,
 	.vop_link =			ntfs_vnop_link,
@@ -9855,18 +9670,14 @@ struct vop_vector ntfs_vnodeops = {
 	.vop_rmdir =			ntfs_vnop_rmdir,
 	.vop_symlink =			ntfs_vnop_symlink,
 	.vop_readdir =			ntfs_vnop_readdir,
-	.vop_readdirattr =		ntfs_vnop_readdirattr,
 	.vop_readlink =			ntfs_vnop_readlink,
 	.vop_inactive =			ntfs_vnop_inactive,
 	.vop_reclaim =			ntfs_vnop_reclaim,
 	.vop_pathconf =			ntfs_vnop_pathconf,
-	.vop_allocate =			ntfs_vnop_allocate,
 	.vop_getxattr =			ntfs_vnop_getxattr,
 	.vop_setxattr =			ntfs_vnop_setxattr,
 	.vop_removexattr =		ntfs_vnop_removexattr,
 	.vop_listxattr =		ntfs_vnop_listxattr,
-	.vop_blktooff =			ntfs_vnop_blktooff,
-	.vop_offtoblk =			ntfs_vnop_offtoblk,
 	.vop_blockmap =			ntfs_vnop_blockmap,
 
 };
