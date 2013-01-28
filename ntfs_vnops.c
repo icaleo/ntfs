@@ -3881,100 +3881,6 @@ static int ntfs_vnop_exchange(struct vnop_exchange_args *a)
 }
 
 /**
- * ntfs_vnop_mmap - map a file (vnode) into memory
- * @a:		arguments to mmap function
- *
- * @a contains:
- *	vnode_t a_vp;			file vnode which to map into memory
- *	int a_fflags;			mapping flags for the vnode
- *	vfs_context_t a_context;
- *
- * Map the file vnode @a->a_vp into memory applying the mapping flags
- * @a->a_fflags which are a combination of one or more of PROT_READ,
- * PROT_WRITE, and PROT_EXEC.
- *
- * VNOP_MMAP() and hence ntfs_vnop_mmap() gets called from ubc_map() which in
- * turn gets called from the mmap() system call when a file is being mapped
- * into memory.
- *
- * The mmap() system call does the necessary permission checking and in fact
- * ignores the return value from ubc_map() and relies on things not working
- * later on for error handling.
- *
- * ubc_map() on the other hand does look at the return value of VNOP_MMAP() but
- * it only cares for one error code and that is EPERM.  All other errors are
- * ignored and not passed to its caller.  Thus for any return value not equal
- * to EPERM, ubc_map() takes an extra reference on the vnode and sets the flags
- * UI_ISMAPPED and UI_WASMAPPED in the ubc info of the vnode and for EPERM it
- * does not do anything and just returns EPERM to the caller.
- *
- * In effect neither class of return value (EPERM or not EPERM) actually has
- * any effect at all so we do not bother doing any checking here and defer all
- * checks to VNOP_PAGEIN() and hence ntfs_vnop_pagein().
- *
- * FIXME: This is a huge problem because it means that anyone can use mmap() on
- * a system file and then write rubbish into the mapped memory and then trash
- * the metadata in the mapped memory by calling msync() to write the rubbish
- * out into the system file on disk!  This will need to be fixed in the kernel
- * I think, i.e. the mmap() system call must fail if VNOP_MMAP() fails.  This
- * is because we have no way to tell who is causing a page{in,out} at
- * ntfs_vnop_page{in,out}() time and for what reason so we have to always
- * permit page{in,out} to be called.
- *
- * Return 0 on success and EPERM on error.
- */
-static int ntfs_vnop_mmap(struct vnop_mmap_args *a)
-{
-#ifdef DEBUG
-	ntfs_inode *ni = NTFS_I(a->a_vp);
-
-	if (ni)
-		ntfs_debug("Mapping mft_no 0x%llx, type 0x%x, name_len 0x%x, "
-				"mapping flags 0x%x.",
-				(unsigned long long)ni->mft_no,
-				le32_to_cpu(ni->type), (unsigned)ni->name_len,
-				a->a_fflags);
-#endif
-	/* Nothing to do. */
-	return 0;
-}
-
-/**
- * ntfs_vnop_mnomap - unmap a file (vnode) from memory
- * @a:		arguments to mnomap function
- *
- * @a contains:
- *	vnode_t a_vp;			file vnode which to unmap from memory
- *	vfs_context_t a_context;
- *
- * Remove the memory mapping of the file vnode @a->a_vp that was previously
- * established via ntfs_vnop_mmap().
- *
- * VNOP_MNOMAP() and hence ntfs_vnop_mnomap() gets called from ubc_unmap() when
- * a file is being unmapped from memory via the munmap() system call.
- *
- * ubc_unmap() only calls VNOP_MNOMAP() if the previous VNOP_MMAP() call did
- * not return EPERM.
- *
- * ubc_unmap() completely ignores the return value from VNOP_MNOMAP().
- *
- * Always return 0 as the return value is always ignored.
- */
-static int ntfs_vnop_mnomap(struct vnop_mnomap_args *a)
-{
-#ifdef DEBUG
-	ntfs_inode *ni = NTFS_I(a->a_vp);
-
-	if (ni)
-		ntfs_debug("Unmapping mft_no 0x%llx, type 0x%x, name_len "
-				"0x%x.", (unsigned long long)ni->mft_no,
-				le32_to_cpu(ni->type), (unsigned)ni->name_len);
-#endif
-	/* Nothing to do. */
-	return 0;
-}
-
-/**
  * ntfs_vnop_fsync - synchronize a vnode's in-core state with that on disk
  * @a:		arguments to fsync function
  *
@@ -9941,8 +9847,6 @@ struct vop_vector ntfs_vnodeops = {
 	.vop_ioctl =			ntfs_vnop_ioctl,
 	.vop_select =			ntfs_vnop_select,
 	.vop_exchange =			ntfs_vnop_exchange,
-	.vop_mmap =			ntfs_vnop_mmap,
-	.vop_mnomap =			ntfs_vnop_mnomap,
 	.vop_fsync =			ntfs_vnop_fsync,
 	.vop_remove =			ntfs_vnop_remove,
 	.vop_link =			ntfs_vnop_link,
