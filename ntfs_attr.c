@@ -4225,7 +4225,7 @@ do_non_resident_extend:
 	 * runlist and only for non-sparse regions do we do the page mapping,
 	 * unmapping and dirtying.
 	 */
-	ofs = old_init_size & ~PAGE_MASK_64;
+	ofs = old_init_size & ~PAGE_MASK;
 	write_locked = locked = FALSE;
 	is_sparse = (NInoSparse(ni));
 	if (is_sparse) {
@@ -4329,7 +4329,7 @@ map_vcn:
 			 * the page size so we need to align at @ofs to the
 			 * page size again.
 			 */
-			ofs &= ~PAGE_MASK_64;
+			ofs &= ~PAGE_MASK;
 			rl = ni->rl.rl;
 		} else {
 			if (write_locked)
@@ -4392,7 +4392,7 @@ map_vcn:
 			while (rl->lcn == LCN_HOLE && rl->length)
 				rl++;
 			ofs = (rl->vcn << vol->cluster_size_shift) &
-					~PAGE_MASK_64;
+					~PAGE_MASK;
 			/*
 			 * Update the initialized size in the ntfs inode.  This
 			 * is enough to make ntfs_vnop_pageout() work.  We
@@ -5240,8 +5240,8 @@ errno_t ntfs_attr_instantiate_holes(ntfs_inode *ni, s64 start, s64 end,
 	 * instantiated so we might as well do it now whilst we are
 	 * instantiating things.
 	 */
-	vcn = (start & ~PAGE_MASK_64) >> vol->cluster_size_shift;
-	end_vcn = ((end + PAGE_MASK) & ~PAGE_MASK_64) >>
+	vcn = (start & ~PAGE_MASK) >> vol->cluster_size_shift;
+	end_vcn = ((end + PAGE_MASK) & ~PAGE_MASK) >>
 			vol->cluster_size_shift;
 	/* Cache the sizes for the attribute so we take the size lock once. */
 	mtx_lock_spin(&ni->size_lock);
@@ -8856,8 +8856,8 @@ errno_t ntfs_attr_set(ntfs_inode *ni, s64 ofs, const s64 cnt, const u8 val)
 		ntfs_error(vol->mp, "Request exceeds end of attribute.");
 		return ESPIPE;
 	}
-	ofs &= ~PAGE_MASK_64;
-	end &= ~PAGE_MASK_64;
+	ofs &= ~PAGE_MASK;
+	end &= ~PAGE_MASK;
 	/* If there is a first partial page, need to do it the slow way. */
 	if (start_ofs) {
 		err = ntfs_page_map(ni, ofs, &upl, &pl, &kaddr, TRUE);

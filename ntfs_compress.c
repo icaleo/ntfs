@@ -641,7 +641,7 @@ errno_t ntfs_read_compressed(ntfs_inode *ni, ntfs_inode *raw_ni, s64 ofs_start,
 				(unsigned long long)ofs,
 				(unsigned long long)ni->data_size);
 	mtx_unlock_spin(&ni->size_lock);
-	size = (init_size + PAGE_MASK) & ~PAGE_MASK_64;
+	size = (init_size + PAGE_MASK) & ~PAGE_MASK;
 	/* @ofs is page aligned and @count is at least one page in size. */
 	if (ofs + count > init_size) {
 		int start_count;

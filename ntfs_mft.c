@@ -210,7 +210,7 @@ errno_t ntfs_mft_record_map_ext(ntfs_inode *ni, MFT_RECORD **mrec,
 				(unsigned long long)ni->mft_no, err);
 	err = EIO;
 buf_err:
-	buf_brelse(buf);
+	brelse(buf);
 err:
 	/*
 	 * Release the iocount reference on the $MFT vnode.  We can ignore the
@@ -250,7 +250,7 @@ void ntfs_mft_record_unmap(ntfs_inode *ni)
 				"0x%llx (error %d).",
 				(unsigned long long)ni->mft_no, err);
 	if (NInoTestClearMrecNeedsDirtying(ni)) {
-		err = buf_bdwrite(buf);
+		err = bdwrite(buf);
 		if (err) {
 			ntfs_error(ni->vol->mp, "Failed to write buffer of "
 					"mft record 0x%llx (error %d).  Run "
@@ -259,7 +259,7 @@ void ntfs_mft_record_unmap(ntfs_inode *ni)
 			NVolSetErrors(ni->vol);
 		}
 	} else
-		buf_brelse(buf);
+		brelse(buf);
 	/*
 	 * Release the iocount reference on the $MFT vnode.  We can ignore the
 	 * return value as it always is zero.
@@ -716,7 +716,7 @@ static errno_t ntfs_mft_bitmap_find_and_alloc_free_rec_nolock(ntfs_volume *vol,
 		if (size) {
 			errno_t err;
 
-			err = ntfs_page_map(mftbmp_ni, ofs & ~PAGE_MASK_64,
+			err = ntfs_page_map(mftbmp_ni, ofs & ~PAGE_MASK,
 					&upl, &pl, &buf, TRUE);
 			if (err) {
 				ntfs_error(vol->mp, "Failed to read mft "
@@ -881,7 +881,7 @@ static errno_t ntfs_mft_bitmap_extend_allocation_nolock(ntfs_volume *vol)
 	 * to us.
 	 */
 	ll = lcn >> 3;
-	err = ntfs_page_map(lcnbmp_ni, ll & ~PAGE_MASK_64, &upl, &pl, &kaddr,
+	err = ntfs_page_map(lcnbmp_ni, ll & ~PAGE_MASK, &upl, &pl, &kaddr,
 			TRUE);
 	if (err) {
 		sx_sunlock(&lcnbmp_ni->lock);
@@ -2922,7 +2922,7 @@ retry:
 			NVolSetErrors(vol);
 			sx_sunlock(&mft_ni->lock);
 			ntfs_inode_unlock_alloc(ni);
-			(void)vnode_recycle(ni->vn);
+			(void)vrecycle(ni->vn);
 			vdrop(ni->vn);
 			goto free_undo_mftbmp_alloc;
 		}
@@ -2930,7 +2930,7 @@ retry:
 		sx_sunlock(&mft_ni->lock);
 		if (err) {
 			ntfs_inode_unlock_alloc(ni);
-			(void)vnode_recycle(ni->vn);
+			(void)vrecycle(ni->vn);
 			vdrop(ni->vn);
 			goto free_undo_mftbmp_alloc;
 		}

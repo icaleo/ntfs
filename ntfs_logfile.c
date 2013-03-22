@@ -590,7 +590,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 	upl = NULL;
 	rstr1_ph = rstr2_ph = NULL;
 	for (pos = ppos = 0; pos < size; pos <<= 1) {
-		if (!upl || (s64)(pos & ~PAGE_MASK_64) != ppos) {
+		if (!upl || (s64)(pos & ~PAGE_MASK) != ppos) {
 			if (upl)
 				ntfs_page_unmap(ni, upl, pl, FALSE);
 			ppos = pos;
@@ -602,7 +602,7 @@ errno_t ntfs_logfile_check(ntfs_inode *ni, RESTART_PAGE_HEADER **rp)
 				goto err;
 			}
 		}
-		kaddr = paddr + (pos & PAGE_MASK_64);
+		kaddr = paddr + (pos & PAGE_MASK);
 		/*
 		 * A non-empty block means the logfile is not empty while an
 		 * empty block after a non-empty block has been encountered

@@ -92,8 +92,8 @@ errno_t __ntfs_bitmap_set_bits_in_run(ntfs_inode *ni, const s64 start_bit,
 	 * Calculate the offsets for the pages containing the first and last
 	 * bits, i.e. @start_bit and @start_bit + @cnt - 1, respectively.
 	 */
-	ofs = (start_bit >> 3) & ~PAGE_MASK_64;
-	end_ofs = ((start_bit + cnt - 1) >> 3) & ~PAGE_MASK_64;
+	ofs = (start_bit >> 3) & ~PAGE_MASK;
+	end_ofs = ((start_bit + cnt - 1) >> 3) & ~PAGE_MASK;
 	/* Get the page containing the first bit (@start_bit). */
 	err = ntfs_page_map(ni, ofs, &upl, &pl, &kaddr, TRUE);
 	if (err) {

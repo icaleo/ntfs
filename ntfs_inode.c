@@ -533,8 +533,8 @@ retry:
 		 * vnode identity with the supplied information if any.
 		 */
 		if (vn) {
-			vnode_t old_parent_vn;
 			const char *old_name;
+			int name_len = NTFS_MAX_NAME_LEN;
 
 			if (is_system && !vnode_issystem(vn))
 				panic("%s(): mft_no 0x%llx, is_system is TRUE "
@@ -542,25 +542,22 @@ retry:
 						"marked VSYSTEM\n",
 						__FUNCTION__,
 						(unsigned long long)mft_no);
-			old_parent_vn = vnode_getparent(vn);
 			old_name = malloc(NTFS_MAX_NAME_LEN, M_TEMP, M_WAITOK);
 			// FIXME: Do we need NULL terminated string in *old_name ?
-			err = vn_vptocnp(&vn, cred, old_name, NTFS_MAX_NAME_LEN);
-			if (ni->link_count > 1 || !old_parent_vn || err) {
+			err = vn_vptocnp(&vn, cred, old_name, &name_len);
+			if (ni->link_count > 1 || err) {
 				char *name = NULL;
-				int len, hash, flags;
-
-				flags = hash = len = 0;
 				/*
 				 * If a parent vnode was supplied and it is
 				 * different from the current one, update it.
-				 */
+				 
 				if (parent_vn && old_parent_vn != parent_vn) {
 					ntfs_debug("Updating vnode identity "
 							"with new parent "
 							"vnode.");
 					flags |= VNODE_UPDATE_PARENT;
 				}
+				*/
 				/*
 				 * If a name was supplied and the vnode has no
 				 * name at present or the names are not the
@@ -575,18 +572,11 @@ retry:
 							"with new name.");
 					name = cn->cn_nameptr;
 					len = cn->cn_namelen;
-					hash = cn->cn_hash;
-					flags |= VNODE_UPDATE_NAME |
-							VNODE_UPDATE_CACHE;
+					cache_purge(vn);
 				}
-				if (flags)
-					vnode_update_identity(vn, parent_vn,
-							name, len, hash, flags);
 			}
 			if (old_name)
 				free(old_name, M_TEMP);
-			if (!parent_vn)
-				parent_vn = old_parent_vn;
 			if (cn && cn->cn_flags & MAKEENTRY) {
 				if (parent_vn)
 					cache_enter(parent_vn, vn, cn);
@@ -596,8 +586,6 @@ retry:
 				 */
 				cn->cn_flags &= ~MAKEENTRY;
 			}
-			if (old_parent_vn)
-				vdrop(old_parent_vn);
 		}
 		*nni = ni;
 		ntfs_debug("Done (found in cache).");
@@ -625,7 +613,7 @@ retry:
 						"inode.");
 				/* Kill the bad inode. */
 				vn = ni->vn;
-				(void)vnode_recycle(vn);
+				(void)vrecycle(vn);
 				goto err;
 			}
 			/*
@@ -3255,7 +3243,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 			}
 			mtx_unlock(&ni->attr_nis_lock);
 			if (!err) {
-				vnode_recycle(attr_ni->vn);
+				vrecycle(attr_ni->vn);
 				vdrop(attr_ni->vn);
 			}
 			/* Give it a chance to go away... */
@@ -3297,7 +3285,7 @@ errno_t ntfs_inode_reclaim(ntfs_inode *ni)
 	/* Detach the ntfs inode from its vnode, if there is one. */
 	vn = ni->vn;
 	if (vn)
-		vnode_clearfsnode(vn);
+		vp->v_data = NULL;
 	/*
 	 * We now have exclusive access to the ntfs inode and as it is unhashed
 	 * no-one else can ever find it thus we can finally destroy it.

@@ -366,7 +366,7 @@ descend_into_child_node:
 	 * the corresponding page.
 	 */
 	err = ntfs_page_map(ia_ni, (vcn << ia_ni->vcn_size_shift) &
-			~PAGE_MASK_64, &upl, &pl, &kaddr, FALSE);
+			~PAGE_MASK, &upl, &pl, &kaddr, FALSE);
 	if (err) {
 		ntfs_error(mp, "Failed to map directory index page (error "
 				"%d).", err);
@@ -1638,7 +1638,7 @@ get_next_bmp_page:
 	 * Convert bit position to byte offset in the index bitmap attribute
 	 * and map the corresponding page.
 	 */
-	err = ntfs_page_map(bmp_ni, (bmp_pos >> 3) & ~PAGE_MASK_64, &bmp_upl,
+	err = ntfs_page_map(bmp_ni, (bmp_pos >> 3) & ~PAGE_MASK, &bmp_upl,
 			&bmp_pl, &bmp, FALSE);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to read directory index bitmap "
@@ -1671,12 +1671,12 @@ find_next_index_buffer:
 	ntfs_debug("Handling index allocation block 0x%llx.",
 			(unsigned long long)bmp_pos + bmp_ofs);
 	/* If the current index block is in the same buffer we reuse it. */
-	if ((prev_ia_pos & ~PAGE_MASK_64) != (ia_pos & ~PAGE_MASK_64)) {
+	if ((prev_ia_pos & ~PAGE_MASK) != (ia_pos & ~PAGE_MASK_64)) {
 		prev_ia_pos = ia_pos;
 		if (ia_upl)
 			ntfs_page_unmap(ia_ni, ia_upl, ia_pl, FALSE);
 		/* Map the page containing the index allocation block. */
-		err = ntfs_page_map(ia_ni, ia_pos & ~PAGE_MASK_64, &ia_upl,
+		err = ntfs_page_map(ia_ni, ia_pos & ~PAGE_MASK, &ia_upl,
 				&ia_pl, &kaddr, FALSE);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to read directory index "

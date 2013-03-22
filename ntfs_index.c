@@ -634,7 +634,7 @@ static errno_t ntfs_index_descend_into_child_node(
 		goto err;
 	}
 	/* Determine the offset of the page containing the child index block. */
-	ofs = (vcn << idx_ni->vcn_size_shift) & ~PAGE_MASK_64;
+	ofs = (vcn << idx_ni->vcn_size_shift) & ~PAGE_MASK;
 	/*
 	 * If the entry whose sub-node we are descending into is in the index
 	 * root, release the index root unlocking its node or we can deadlock
@@ -2074,7 +2074,7 @@ static errno_t ntfs_index_block_alloc(ntfs_index_context *ictx, VCN *dst_vcn,
 	 * now so that its tail is zeroed due to the old value of the
 	 * initialized size.
 	 */
-	err = ntfs_page_map(bmp_ni, bmp_pos & ~PAGE_MASK_64, &upl, &pl, &bmp,
+	err = ntfs_page_map(bmp_ni, bmp_pos & ~PAGE_MASK, &upl, &pl, &bmp,
 			TRUE);
 	if (err) {
 		ntfs_error(idx_ni->vol->mp, "Failed to read index bitmap "
@@ -2163,7 +2163,7 @@ allocated_bit:
 	 * bitmap we need to get the page before we set the initialized size so
 	 * that the tail of the page is zeroed for us.
 	 */
-	upl_ofs = (bmp_pos << idx_ni->block_size_shift) & ~PAGE_MASK_64;
+	upl_ofs = (bmp_pos << idx_ni->block_size_shift) & ~PAGE_MASK;
 	err = ntfs_page_map(idx_ni, upl_ofs, &upl, &pl, &bmp, TRUE);
 	if (err) {
 		ntfs_error(idx_ni->vol->mp, "Failed to read index allocation "
@@ -3016,7 +3016,7 @@ update_ie_pointers:
 		ictx->vcn = vcn;
 		ia->index_block_vcn = cpu_to_sle64(vcn);
 		ictx->upl_ofs = (vcn << idx_ni->vcn_size_shift) &
-				~PAGE_MASK_64;
+				~PAGE_MASK;
 		/* Get hold of the mft record for the index inode. */
 		err = ntfs_mft_record_map(base_ni, &m);
 		if (err) {
@@ -4898,7 +4898,7 @@ out:
 		upl_page_info_array_t pl;
 		u8 *bmp_start, *bmp;
 
-		err = ntfs_page_map(bmp_ni, bmp_pos & ~PAGE_MASK_64, &upl,
+		err = ntfs_page_map(bmp_ni, bmp_pos & ~PAGE_MASK, &upl,
 				&pl, &bmp_start, FALSE);
 		if (err) {
 			ntfs_debug("Failed to read index bitmap (error %d).",
@@ -4940,7 +4940,7 @@ out:
 			 * @bit now contains the last set bit in the byte thus
 			 * we can determine the last set bit in the bitmap.
 			 */
-			idx_ni->last_set_bit = (((bmp_pos & ~PAGE_MASK_64) +
+			idx_ni->last_set_bit = (((bmp_pos & ~PAGE_MASK) +
 					(bmp - bmp_start)) << 3) + bit;
 			if (target_pos < idx_ni->last_set_bit)
 				goto done;

@@ -212,7 +212,7 @@ compressed:
 	 * the end of the attribute or if the attribute offset is not page
 	 * aligned or the size requested is not a multiple of PAGE_SIZE.
 	 */
-	if (attr_ofs < 0 || attr_ofs >= attr_size || attr_ofs & PAGE_MASK_64 ||
+	if (attr_ofs < 0 || attr_ofs >= attr_size || attr_ofs & PAGE_MASK ||
 			size & PAGE_MASK || upl_ofs & PAGE_MASK) {
 		err = EINVAL;
 		goto err;
@@ -377,9 +377,7 @@ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
 		panic("%s() called with non page aligned offset (0x%llx).",
 				__FUNCTION__, (unsigned long long)ofs);
 	mtx_lock_spin(&ni->size_lock);
-	size = ubc_getsize(ni->vn);
-	if (size > ni->data_size)
-		size = ni->data_size;
+	size = ni->data_size;
 	mtx_unlock_spin(&ni->size_lock);
 	if (ofs > size) {
 		ntfs_error(ni->vol->mp, "Offset 0x%llx is outside the end of "

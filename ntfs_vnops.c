@@ -2585,7 +2585,7 @@ static inline int ntfs_vnop_read_compressed(ntfs_inode *ni, uio_t uio,
 		 * Do not exceed the attribute size except for a final partial
 		 * page.
 		 */
-		size = (data_size - ofs + PAGE_MASK) & ~PAGE_MASK_64;
+		size = (data_size - ofs + PAGE_MASK) & ~PAGE_MASK;
 		if (count > size)
 			count = size;
 		start_count = count;
@@ -7240,7 +7240,7 @@ sync:
 	 * Cause the vnode to be reused immediately when we return rather than
 	 * sitting around in the vnode cache.
 	 */
-	vnode_recycle(vn);
+	vrecycle(vn);
 	/*
 	 * ntfs_unlink() and ntfs_vnop_rename() bail out for attribute inodes
 	 * so we cannot get here with an attribute inode unless something has
@@ -7725,7 +7725,7 @@ static int ntfs_mst_pageout(ntfs_inode *ni, upl_t upl, upl_offset_t upl_ofs,
 			(unsigned long long)upl_ofs, size,
 			(unsigned long long)attr_ofs, flags,
 			(unsigned)le32_to_cpu(magic));
-	if (attr_ofs < 0 || attr_ofs >= attr_size || attr_ofs & PAGE_MASK_64 ||
+	if (attr_ofs < 0 || attr_ofs >= attr_size || attr_ofs & PAGE_MASK ||
 			size & PAGE_MASK || upl_ofs & PAGE_MASK) {
 		err = EINVAL;
 		goto err;

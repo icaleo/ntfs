@@ -338,7 +338,7 @@ descend_into_child_node:
 	 * the corresponding page.
 	 */
 	err = ntfs_page_map(ni, (vcn << ni->vcn_size_shift) &
-			~PAGE_MASK_64, &upl, &pl, &kaddr, FALSE);
+			~PAGE_MASK, &upl, &pl, &kaddr, FALSE);
 	if (err) {
 		ntfs_error(vol->mp, "Failed to map index page, error %d.",
 				err);

@@ -1330,7 +1330,7 @@ static errno_t ntfs_mft_mirror_load(ntfs_volume *vol)
 			ni->initialized_size & vol->mft_record_size_mask) {
 		ntfs_error(vol->mp, "$DATA attribute contains invalid size.  "
 				"$MFTMirr is corrupt.  Run chkdsk.");
-		(void)vnode_recycle(vn);
+		(void)vrecycle(vn);
 		vdrop(vn);
 		return EIO;
 	}
@@ -1597,7 +1597,7 @@ static errno_t ntfs_upcase_load(ntfs_volume *vol)
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
 	sx_sunlock(&ni->lock);
-	(void)vnode_recycle(ni->vn);
+	(void)vrecycle(ni->vn);
 	vdrop(ni->vn);
 	vol->upcase_len = data_size >> NTFSCHAR_SIZE_SHIFT;
 	ntfs_debug("Read %lld bytes from $UpCase (expected %lu bytes).",
@@ -1638,7 +1638,7 @@ err:
 	}
 	if (ni) {
 		sx_sunlock(&ni->lock);
-		(void)vnode_recycle(ni->vn);
+		(void)vrecycle(ni->vn);
 		vdrop(ni->vn);
 	}
 	lockmgr(&ntfs_lock, LK_EXCLUSIVE, NULL);
@@ -1714,7 +1714,7 @@ static errno_t ntfs_attrdef_load(ntfs_volume *vol)
 		ntfs_page_unmap(ni, upl, pl, FALSE);
 	}
 	sx_sunlock(&ni->lock);
-	(void)vnode_recycle(ni->vn);
+	(void)vrecycle(ni->vn);
 	vdrop(ni->vn);
 	vol->attrdef_size = data_size;
 	ntfs_debug("Done.  Read %lld bytes from $AttrDef.",
@@ -1727,7 +1727,7 @@ err:
 	}
 	if (ni) {
 		sx_sunlock(&ni->lock);
-		(void)vnode_recycle(ni->vn);
+		(void)vrecycle(ni->vn);
 		vdrop(ni->vn);
 	}
 	ntfs_error(vol->mp, "Failed to initialize attribute definitions "
@@ -2012,7 +2012,7 @@ unm:
 	ntfs_page_unmap(ni, upl, pl, FALSE);
 put:
 	sx_sunlock(&ni->lock);
-	(void)vnode_recycle(ni->vn);
+	(void)vrecycle(ni->vn);
 	vdrop(ni->vn);
 	return err;
 }
@@ -3326,7 +3326,7 @@ static int ntfs_unmount_callback_recycle(vnode_t vn, void *data __unused)
 		ntfs_debug("Entering for mft_no 0x%llx.",
 				(unsigned long long)NTFS_I(vn)->mft_no);
 #endif
-	(void)vnode_recycle(vn);
+	(void)vrecycle(vn);
 	ntfs_debug("Done.");
 	return VNODE_RETURNED;
 }
@@ -3351,7 +3351,7 @@ static void ntfs_unmount_inode_detach(ntfs_inode **pni, ntfs_inode *parent_ni)
 			atomic_subtract_32(&parent_ni->nr_refs, 1);
 		atomic_subtract_32(&ni->nr_refs, 1);
 		if (ni->vn) {
-			(void)vnode_recycle(ni->vn);
+			(void)vrecycle(ni->vn);
 			vnode_rele(ni->vn);
 		} else
 			ntfs_inode_reclaim(ni);
@@ -3382,7 +3382,7 @@ static void ntfs_unmount_attr_inode_detach(ntfs_inode **pni)
 			atomic_subtract_32(&ni->base_ni->nr_refs, 1);
 		atomic_subtract_32(&ni->nr_refs, 1);
 		if (ni->vn) {
-			(void)vnode_recycle(ni->vn);
+			(void)vrecycle(ni->vn);
 			vnode_rele(ni->vn);
 		} else
 			ntfs_inode_reclaim(ni);

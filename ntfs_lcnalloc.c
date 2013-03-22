@@ -310,7 +310,7 @@ errno_t ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 				need_writeback = FALSE;
 			}
 		}
-		err = ntfs_page_map(lcnbmp_ni, last_read_pos & ~PAGE_MASK_64,
+		err = ntfs_page_map(lcnbmp_ni, last_read_pos & ~PAGE_MASK,
 				&upl, &pl, &b, TRUE);
 		if (err) {
 			ntfs_error(vol->mp, "Failed to map page.");
