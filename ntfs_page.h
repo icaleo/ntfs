@@ -42,20 +42,15 @@
 #include "ntfs_inode.h"
 #include "ntfs_types.h"
 
-extern int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size,
-		upl_t upl, upl_offset_t upl_ofs, int flags);
-
-extern errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs,
-		upl_t *upl, upl_page_info_array_t *pl, u8 **kaddr,
-		const BOOL uptodate, const BOOL rw);
+extern errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, buf_t *bpp, 
+		caddr_t *io_addr, const BOOL uptodate, const BOOL rw);
 
 /**
  * ntfs_page_map - map a page of a vnode into memory
  * @ni:		ntfs inode of which to map a page
  * @ofs:	byte offset into @ni of which to map a page
- * @upl:	destination page list for the page
- * @pl:		destination array of pages containing the page itself
- * @kaddr:	destination pointer for the address of the mapped page contents
+ * @bpp         buf_t pointer
+ * @io_addr     bp->b_data addr for io
  * @rw:		if true we intend to modify the page and if false we do not
  *
  * Map the page corresponding to byte offset @ofs into the ntfs inode @ni into
@@ -72,19 +67,18 @@ extern errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs,
  * Locking: - Caller must hold an iocount reference on the vnode of @ni.
  *	    - Caller must hold @ni->lock for reading or writing.
  */
-static inline errno_t ntfs_page_map(ntfs_inode *ni, s64 ofs, upl_t *upl,
-		upl_page_info_array_t *pl, u8 **kaddr, const BOOL rw)
+static inline errno_t ntfs_page_map(ntfs_inode *ni, s64 ofs, buf_t *bpp,
+		caddr_t *io_addr, const BOOL rw)
 {
-	return ntfs_page_map_ext(ni, ofs, upl, pl, kaddr, TRUE, rw);
+	return ntfs_page_map_ext(ni, ofs, bpp, io_addr, TRUE, rw);
 }
 
 /**
  * ntfs_page_grab - map a page of a vnode into memory
  * @ni:		ntfs inode of which to map a page
  * @ofs:	byte offset into @ni of which to map a page
- * @upl:	destination page list for the page
- * @pl:		destination array of pages containing the page itself
- * @kaddr:	destination pointer for the address of the mapped page contents
+ * @bpp         buf_t pointer
+ * @io_addr     bp->b_data addr for io
  * @rw:		if true we intend to modify the page and if false we do not
  *
  * Map the page corresponding to byte offset @ofs into the ntfs inode @ni into
@@ -102,16 +96,14 @@ static inline errno_t ntfs_page_map(ntfs_inode *ni, s64 ofs, upl_t *upl,
  * Locking: - Caller must hold an iocount reference on the vnode of @ni.
  *	    - Caller must hold @ni->lock for reading or writing.
  */
-static inline errno_t ntfs_page_grab(ntfs_inode *ni, s64 ofs, upl_t *upl,
-		upl_page_info_array_t *pl, u8 **kaddr, const BOOL rw)
+static inline errno_t ntfs_page_grab(ntfs_inode *ni, s64 ofs, buf_t *bpp,
+		caddr_t *io_addr, u8 **kaddr, const BOOL rw)
 {
-	return ntfs_page_map_ext(ni, ofs, upl, pl, kaddr, FALSE, rw);
+	return ntfs_page_map_ext(ni, ofs, bpp, io_addr, FALSE, rw);
 }
 
-extern void ntfs_page_unmap(ntfs_inode *ni, upl_t upl,
-		upl_page_info_array_t pl, const BOOL mark_dirty);
+extern void ntfs_page_unmap(ntfs_inode *ni, buf_t bp, const BOOL mark_dirty);
 
-extern void ntfs_page_dump(ntfs_inode *ni, upl_t upl,
-		upl_page_info_array_t pl);
+extern void ntfs_page_dump(ntfs_inode *ni, buf_t bp);
 
 #endif /* !_BSD_NTFS_PAGE_H */

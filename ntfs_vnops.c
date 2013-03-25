@@ -3115,8 +3115,8 @@ static errno_t ntfs_write(ntfs_inode *ni, uio_t uio, int ioflags,
 	off_t old_ofs, ofs;
 	vnode_t vn = ni->vn;
 	ntfs_inode *base_ni;
-	upl_t upl;
-	upl_page_info_array_t pl;
+	buf_t bp;
+	caddr_t *io_addr;
 	u8 *kaddr;
 	int cnt;
 	errno_t err;
@@ -3529,12 +3529,12 @@ recheck_deleted:
 	 * already thus saving a pagein from disk.
 	 */
 	need_uptodate = (ofs || end < size);
-	err = ntfs_page_map_ext(ni, 0, &upl, &pl, &kaddr, need_uptodate, TRUE);
+	err = ntfs_page_map_ext(ni, 0, bp, &io_addr, need_uptodate, TRUE);
 	if (err) {
 		ntfs_error(ni->vol->mp, "Failed to map page (error %d).", err);
 		goto abort;
 	}
-	err = uiomove((caddr_t)(kaddr + ofs), cnt, uio);
+	err = uiomove((caddr_t)(io_addr + ofs), cnt, uio);
 	if (err) {
 		/*
 		 * If we just caused the page to exist and did not bring it

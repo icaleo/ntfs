@@ -46,13 +46,13 @@
 #include "ntfs_types.h"
 #include "ntfs_volume.h"
 
+#if 0
 /**
  * ntfs_pagein - read a range of pages into memory
  * @ni:		ntfs inode whose data to read into the page range
  * @attr_ofs:	byte offset in the inode at which to start
  * @size:	number of bytes to read from the inode
- * @upl:	page list describing destination page range
- * @upl_ofs:	byte offset into page list at which to start
+ * @bp:		buf pointer
  * @flags:	flags further describing the pagein request
  *
  * Read @size bytes from the ntfs inode @ni, starting at byte offset @attr_ofs
@@ -100,28 +100,25 @@
  *	      reading unless UPL_NESTED_PAGEOUT is set in @flags in which case
  *	      the caller must hold @ni->lock for reading or writing.
  */
-int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size, upl_t upl,
-		upl_offset_t upl_ofs, int flags)
+int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size, buf_t bp,
+		int flags)
 {
 	s64 attr_size;
-	u8 *kaddr;
-	kern_return_t kerr;
 	unsigned to_read;
 	int err;
 	BOOL locked = FALSE;
 
 	ntfs_debug("Entering for mft_no 0x%llx, offset 0x%llx, size 0x%x, "
-			"pagein flags 0x%x, page list offset 0x%llx.",
+			"pagein flags 0x%x.",
 			(unsigned long long)ni->mft_no,
-			(unsigned long long)attr_ofs, size, flags,
-			(unsigned long long)upl_ofs);
+			(unsigned long long)attr_ofs, size, flags);
 	/*
 	 * If the caller did not specify any i/o, then we are done.  We cannot
 	 * issue an abort because we do not have a upl or we do not know its
 	 * size.
 	 */
-	if (!upl) {
-		ntfs_error(ni->vol->mp, "NULL page list passed in (error "
+	if (!bp) {
+		ntfs_error(ni->vol->mp, "NULL buf pointer passed in (error "
 				"EINVAL).");
 		return EINVAL;
 	}
@@ -130,22 +127,10 @@ int ntfs_pagein(ntfs_inode *ni, s64 attr_ofs, unsigned size, upl_t upl,
 		err = EISDIR;
 		goto err;
 	}
-	/*
-	 * Protect against changes in initialized_size and thus against
-	 * truncation also unless UPL_NESTED_PAGEOUT is set in which case the
-	 * caller has already taken @ni->lock for exclusive access.  We simply
-	 * leave @locked to be FALSE in this case so we do not try to drop the
-	 * lock later on.
-	 *
-	 * If UPL_NESTED_PAGEOUT is set we clear it in @flags to ensure we do
-	 * not cause confusion in the cluster layer or the VM.
-	 */
-	if (flags & UPL_NESTED_PAGEOUT)
-		flags &= ~UPL_NESTED_PAGEOUT;
-	else {
-		locked = TRUE;
-		sx_slock(&ni->lock);
-	}
+	
+	locked = TRUE;
+	sx_slock(&ni->lock);
+
 	/* Do not allow messing with the inode once it has been deleted. */
 	if (NInoDeleted(ni)) {
 		/* Remove the inode from the name cache. */
@@ -330,14 +315,15 @@ err:
 		sx_sunlock(&ni->lock);
 	return err;
 }
+#endif
+
 
 /**
  * ntfs_page_map_ext - map a page of a vnode into memory
  * @ni:		ntfs inode of which to map a page
  * @ofs:	byte offset into @ni of which to map a page
- * @upl:	destination page list for the page
- * @pl:		destination array of pages containing the page itself
- * @kaddr:	destination pointer for the address of the mapped page contents
+ * @bpp		buf_t pointer
+ * @io_addr	b_data addr for io
  * @uptodate:	if true return an uptodate page and if false return it as is
  * @rw:		if true we intend to modify the page and if false we do not
  *
@@ -346,7 +332,7 @@ err:
  * page in @pl and the address of the mapped page contents in @kaddr.
  *
  * If @uptodate is true the page is returned uptodate, i.e. if the page is
- * currently not valid, it will be brought uptodate via a call to ntfs_pagein()
+ * currently not valid, it will be brought uptodate via a call to bstrategy()
  * before it is returned.  And if @uptodate is false, the page is just returned
  * ignoring its state.  This means the page may or may not be uptodate.
  *
@@ -360,14 +346,13 @@ err:
  *
  * Return 0 on success and errno on error in which case *@upl is set to NULL.
  */
-errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
-		upl_page_info_array_t *pl, u8 **kaddr, const BOOL uptodate,
-		const BOOL rw)
+errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, buf_t *bpp, caddr_t *io_addr, 
+		const BOOL uptodate, const BOOL rw)
 {
 	s64 size;
-	kern_return_t kerr;
 	int abort_flags;
 	errno_t err;
+	buf_t bp;
 
 	ntfs_debug("Entering for inode 0x%llx, offset 0x%llx, rw is %s.",
 			(unsigned long long)ni->mft_no,
@@ -387,23 +372,25 @@ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
 		err = EINVAL;
 		goto err;
 	}
-	/* Create a page list for the wanted page. */
-	kerr = ubc_create_upl(ni->vn, ofs, PAGE_SIZE, upl, pl, UPL_SET_LITE |
-			(rw ? UPL_WILL_MODIFY : 0));
-	if (kerr != KERN_SUCCESS)
-		panic("%s(): Failed to get page (error %d).\n", __FUNCTION__,
-				(int)kerr);
+	/* Get buffer for wanted page. */
+	*bpp = bp = getblk(ni->vn, ofs >> PAGE_SHIFT, PAGE_SIZE, 0, 0, 0);
+	if (bp == NULL)
+		panic("%s(): Failed to get buffer.\n", __FUNCTION__);
 	/*
 	 * If the page is not valid, need to read it in from the vnode now thus
 	 * making it valid.
-	 *
-	 * We set UPL_NESTED_PAGEOUT to let ntfs_pagein() know that we already
-	 * have the inode locked (@ni->lock is held by the caller).
 	 */
-	if (uptodate && !upl_valid_page(*pl, 0)) {
+	if (uptodate && (bp->b_flags & B_CACHE) == 0)) {
 		ntfs_debug("Reading page as it was not valid.");
-		err = ntfs_pagein(ni, ofs, PAGE_SIZE, *upl, 0, UPL_IOSYNC |
-				UPL_NOCOMMIT | UPL_NESTED_PAGEOUT);
+		if (!TD_IS_IDLETHREAD(curthread))
+			curthread->td_ru.ru_inblock++;
+		bp->b_iocmd = BIO_READ;
+                bp->b_flags &= ~B_INVAL;
+                bp->b_ioflags &= ~BIO_ERROR;
+		vfs_busy_pages(bp, 0);
+		bp->b_iooffset = dbtob(bp->b_blkno);
+		bstrategy(bp);
+		err = bufwait(bp);
 		if (err) {
 			ntfs_error(ni->vol->mp, "Failed to read page (error "
 					"%d).", err);
@@ -411,8 +398,8 @@ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
 		}
 	}
 	/* Map the page into the kernel's address space. */
-	kerr = ubc_upl_map(*upl, (vm_offset_t*)kaddr);
-	if (kerr == KERN_SUCCESS) {
+	err = buf_map(bp, io_addr);
+	if (*io_addr != NULL) {
 		ntfs_debug("Done.");
 		return 0;
 	}
@@ -420,79 +407,51 @@ errno_t ntfs_page_map_ext(ntfs_inode *ni, s64 ofs, upl_t *upl,
 			(int)kerr);
 	err = EIO;
 pagein_err:
-	abort_flags = UPL_ABORT_FREE_ON_EMPTY;
-	if (!upl_valid_page(*pl, 0) ||
-			(vnode_isnocache(ni->vn) && !upl_dirty_page(*pl, 0)))
-		abort_flags |= UPL_ABORT_DUMP_PAGES;
-	ubc_upl_abort_range(*upl, 0, PAGE_SIZE, abort_flags);
+	brelse(bp);
 err:
-	*upl = NULL;
 	return err;
 }
 
 /**
  * ntfs_page_unmap - unmap a page belonging to a vnode from memory
  * @ni:		ntfs inode to which the page belongs
- * @upl:	page list of the page
- * @pl:		array of pages containing the page itself
+ * @bp;		buf pointer
  * @mark_dirty:	mark the page dirty
  *
  * Unmap the page belonging to the ntfs inode @ni from memory releasing it back
  * to the vm.
- *
- * The page is described by the page list @upl, the array of pages containing
- * the page @pl and the address of the mapped page contents @kaddr.
  *
  * If @mark_dirty is TRUE, tell the vm to mark the page dirty when releasing
  * the page.
  *
  * Locking: Caller must hold an iocount reference on the vnode of @ni.
  */
-void ntfs_page_unmap(ntfs_inode *ni, upl_t upl, upl_page_info_array_t pl,
-		const BOOL mark_dirty)
+void ntfs_page_unmap(ntfs_inode *ni, buf_t bp, const BOOL mark_dirty)
 {
-	kern_return_t kerr;
+	errno_t err;
 	BOOL was_valid, was_dirty;
+	was_valid = was_dirty = FALSE;
 
-	was_valid = upl_valid_page(pl, 0);
-	/* The page dirty bit is only valid if the page was valid. */
-	was_dirty = (was_valid && upl_dirty_page(pl, 0));
+	if (!(bp->b_flags & B_INVAL))
+		was_valid = TRUE;
+	if (bp->b_flags & B_DELWRI)
+		was_dirty = TRUE;
 	ntfs_debug("Entering for inode 0x%llx, page was %svalid %s %sdirty%s.",
 			(unsigned long long)ni->mft_no,
 			was_valid ? "" : "not ",
 			(int)was_valid ^ (int)was_dirty ? "but" : "and",
 			was_dirty ? "" : "not ",
 			mark_dirty ? ", marking it dirty" : "");
-	/* Unmap the page from the kernel's address space. */
-	kerr = ubc_upl_unmap(upl);
-	if (kerr != KERN_SUCCESS)
-		ntfs_warning(ni->vol->mp, "ubc_upl_unmap() failed (error %d).",
-				(int)kerr);
-	/*
-	 * If the page was valid and dirty or is being made dirty or if caching
-	 * for the vnode is enabled (as it will usually be the case for all
-	 * metadata files), commit it thus releasing it into the vm taking care
-	 * to preserve the dirty state and marking the page dirty if requested
-	 * when committing the page.
-	 *
-	 * If the page was not valid or was valid but not dirty, it is not
-	 * being marked dirty, and caching is disabled on the vnode, dump the
-	 * page.
-	 */
-	if (was_dirty || mark_dirty || !vnode_isnocache(ni->vn)) {
-		int commit_flags;
-
-		commit_flags = UPL_COMMIT_FREE_ON_EMPTY |
-				UPL_COMMIT_INACTIVATE;
-		if (!was_valid && !mark_dirty)
-			commit_flags |= UPL_COMMIT_CLEAR_DIRTY;
-		else if (was_dirty || mark_dirty)
-			commit_flags |= UPL_COMMIT_SET_DIRTY;
-		ubc_upl_commit_range(upl, 0, PAGE_SIZE, commit_flags);
+	
+	if (was_dirty || mark_dirty) {
+		if (mark_dirty)
+			bdirty(bp);
+		err = bufwrite(bp);
+		if (err)
+			panic("%s(): Failed to write buf", __FUNCTION__);
 		ntfs_debug("Done (committed page).");
 	} else {
-		ubc_upl_abort_range(upl, 0, PAGE_SIZE, UPL_ABORT_DUMP_PAGES |
-				UPL_ABORT_FREE_ON_EMPTY);
+		brelse(bp);
 		ntfs_debug("Done (dumped page).");
 	}
 }
@@ -500,8 +459,7 @@ void ntfs_page_unmap(ntfs_inode *ni, upl_t upl, upl_page_info_array_t pl,
 /**
  * ntfs_page_dump - discard a page belonging to a vnode from memory
  * @ni:		ntfs inode to which the page belongs
- * @upl:	page list of the page
- * @pl:		array of pages containing the page itself
+ * @bp:		buf pointer
  *
  * Unmap the page belonging to the ntfs inode @ni from memory throwing it away.
  * Note that if the page is dirty all changes to the page will be lost as it
@@ -512,22 +470,14 @@ void ntfs_page_unmap(ntfs_inode *ni, upl_t upl, upl_page_info_array_t pl,
  *
  * Locking: Caller must hold an iocount reference on the vnode of @ni.
  */
-void ntfs_page_dump(ntfs_inode *ni, upl_t upl,
-		upl_page_info_array_t pl __unused)
+void ntfs_page_dump(ntfs_inode *ni, buf_t bp)
 {
-	kern_return_t kerr;
 
 	ntfs_debug("Entering for inode 0x%llx, page is %svalid, %sdirty.",
 			(unsigned long long)ni->mft_no,
-			upl_valid_page(pl, 0) ? "" : "not ",
-			upl_dirty_page(pl, 0) ? "" : "not ");
-	/* Unmap the page from the kernel's address space. */
-	kerr = ubc_upl_unmap(upl);
-	if (kerr != KERN_SUCCESS)
-		ntfs_warning(ni->vol->mp, "ubc_upl_unmap() failed (error %d).",
-				(int)kerr);
+			!(bp->b_flags & B_INVAL) ? "" : "not ",
+			(bp->b_flags & B_DELWRI) ? "" : "not ");
 	/* Dump the page. */
-	ubc_upl_abort_range(upl, 0, PAGE_SIZE, UPL_ABORT_DUMP_PAGES |
-			UPL_ABORT_FREE_ON_EMPTY);
+	brelse(bp);
 	ntfs_debug("Done.");
 }
